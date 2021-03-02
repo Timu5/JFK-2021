@@ -1,16 +1,19 @@
 from lexer import *
-#from jsonparser import Parser
+from _parser import Parser
 
-test = 'version: "3.9"\n  \n  b:\nc:\n  d:\n    e:'
+test = 'version: "3.9"\nservices: \n  test:\n    image: costam\n'
 
 lex = Lexer(test)
-#par = Parser(lex)
 
-#print(par.json())
+par = Parser(lex)
 
-tok = Token.UNKNOWN
+par.root()
+print("Valid!")
+
+'''tok = Token.UNKNOWN
 
 while tok != Token.EOF:
     tok = lex.gettoken()
     print(tok.name)
 
+'''
