@@ -1,4 +1,5 @@
 from enum import Enum
+import re
 
 
 class Token(Enum):
@@ -11,7 +12,7 @@ class Token(Enum):
     DASH = 3
 
     STRING = 4
-    ID = 5
+    #ID = 5
     NUMBER = 6
 
     VERSION = 7
@@ -26,12 +27,21 @@ class Token(Enum):
 
     INDENT = 16
     DEDENT = 17
+    STRING_PORT = 22
+    STRING_VERSION = 23
 
 
 _keywords = ["version", "services", "build", "ports",
              "image", "volumes", "enviroment", "networks", "deploy"]
 _keywordsToken = [Token.VERSION, Token.SERVICES, Token.BUILD, Token.PORTS,
                   Token.IMAGE, Token.VOLUMES, Token.ENVIROMENT, Token.NETWORKS, Token.DEPLOY]
+'''_keywords = []
+_keywordsToken = []'''
+
+
+def is_keyword(token):
+    return token in _keywordsToken
+
 
 class Lexer:
 
@@ -39,13 +49,12 @@ class Lexer:
         self.input = input
         self.index = 0
         self.buffer = ""
-        self.number = 1
         self.line = 1
         self.col = 1
         self.lastchar = ' '
-        #self.lastint = ord(self.lastchar)
         self.indentation = 0
         self.new_indentation = 0
+        self.indents = [0]
         self.nextchar()
 
     def nextchar(self):
@@ -63,19 +72,15 @@ class Lexer:
 
         return self.lastchar
 
-    def untilnl(self):
-        self.buffer = ""
-        while self.lastchar == "\n" or self.lastchar == '\x00':
-            self.buffer += self.lastchar
-            self.nextchar()
-
-        return self.buffer
+    def unget(self):
+        self.index -= 2
+        self.col -= 2
+        self.nextchar()
 
     def gettoken(self):
-        
+
         if self.new_indentation > self.indentation:
-            if self.new_indentation - self.indentation > 2:
-                raise Exception("You fucking idiot!!!")
+            self.indents.append(self.new_indentation - self.indentation)
             self.indentation = self.new_indentation
             return Token.INDENT
 
@@ -88,70 +93,40 @@ class Lexer:
             return Token.NL
 
         if self.new_indentation < self.indentation:
-            self.indentation -= 2
+            size = self.indents.pop()
+            self.indentation -= size
+            if(self.indentation < 0):
+                raise Exception("Indents do not match")
             return Token.DEDENT
 
         if self.lastchar == "\x00":
             if self.indentation != 0:
                 self.new_indentation = 0
                 return Token.NL
-                #return self.gettoken()
             return Token.EOF
 
-        if self.lastchar.isalpha():
+        if self.lastchar.isalpha() or self.lastchar.isdigit():
             self.buffer = ""
-            while self.lastchar.isalpha():
+            while self.lastchar != '\n' and self.lastchar != '\x00':
+                if self.lastchar == ':':
+                    self.nextchar()
+                    if self.lastchar == ' ' or self.lastchar == '\n' or self.lastchar == '\x00':
+                        self.unget()
+                        break
                 self.buffer += self.lastchar
                 self.nextchar()
 
             if self.buffer in _keywords:
                 return _keywordsToken[_keywords.index(self.buffer)]
 
-            return Token.ID
+            # use regex to find subtype of string
+            if re.match(r"^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$", self.buffer) != None:
+                return Token.NUMBER
 
-        elif self.lastchar.isdigit():
-            value = 0.0
-            exponent = 0
+            #if re.match(r"^([0-9]{2,5})+(:([0-9]{2,5}))?$", self.buffer) != None:
+            #    return Token.STRING_PORT
 
-            while self.lastchar.isdigit():
-                value = value * 10 + (ord(self.lastchar) - ord('0'))
-                self.nextchar()
-
-            if self.lastchar == '.':
-                self.nextchar()
-                while self.lastchar.isdigit():
-                    value = value * 10 + (ord(self.lastchar) - ord('0'))
-                    exponent -= 1
-                    self.nextchar()
-
-            if self.lastchar == 'e' or self.lastchar == 'E':
-                sign = 1
-                i = 0
-                self.nextchar()
-                if self.lastchar == '-':
-                    sign = -1
-                    self.nextchar()
-                elif self.lastchar == '+':
-                    # do nothing when positive :)
-                    self.nextchar()
-
-                while self.lastchar.isdigit():
-                    i = i * 10 + (ord(self.lastchar) - ord('0'))
-                    self.nextchar()
-
-                exponent += sign * i
-
-            while exponent > 0:
-                value *= 10
-                exponent -= 1
-
-            while exponent < 0:
-                value *= 0.1
-                exponent += 1
-
-            self.number = value
-
-            return Token.NUMBER
+            return Token.STRING
 
         elif self.lastchar == '"':
             self.nextchar()
@@ -161,9 +136,19 @@ class Lexer:
                 self.nextchar()
 
             if self.lastchar == '\x00':
-                raise "Unexpected end of file"
+                raise Exception("Unexpected end of file")
 
             self.nextchar()
+
+            if re.match(r"^([0-9]{2,5})+(:([0-9]{2,5}))?$", self.buffer) != None:
+                return Token.STRING_PORT
+
+            if re.match(r"^[1-3]+(\.\d+)?$", self.buffer) != None:
+                return Token.STRING_VERSION
+
+            # use regex to find subtype of string
+
+            
             return Token.STRING
 
         tmp = Token.UNKNOWN
