@@ -79,10 +79,6 @@ class Lexer:
             self.indentation = self.new_indentation
             return Token.INDENT
 
-        if self.new_indentation < self.indentation:
-            self.indentation -= 2
-            return Token.DEDENT
-
         if self.lastchar == "\n":
             self.new_indentation = 0
             while self.nextchar() == ' ':
@@ -91,10 +87,15 @@ class Lexer:
                 return self.gettoken()
             return Token.NL
 
+        if self.new_indentation < self.indentation:
+            self.indentation -= 2
+            return Token.DEDENT
+
         if self.lastchar == "\x00":
             if self.indentation != 0:
                 self.new_indentation = 0
-                return self.gettoken()
+                return Token.NL
+                #return self.gettoken()
             return Token.EOF
 
         if self.lastchar.isalpha():
