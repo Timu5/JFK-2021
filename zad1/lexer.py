@@ -1,6 +1,8 @@
 from enum import Enum
 import re
+from collections import namedtuple
 
+TokenTuple = namedtuple('TokenTuple', 'type line col')
 
 class Token(Enum):
     EOF = -1
@@ -78,6 +80,9 @@ class Lexer:
         self.nextchar()
 
     def gettoken(self):
+        return TokenTuple(type=self._gettoken(), line=self.line, col=self.col)
+
+    def _gettoken(self):
 
         if self.new_indentation > self.indentation:
             self.indents.append(self.new_indentation - self.indentation)
