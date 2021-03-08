@@ -94,7 +94,7 @@ class Lexer:
             while self.nextchar() == ' ':
                 self.new_indentation += 1
             if self.lastchar == '\n':
-                return self.gettoken()
+                return self._gettoken()
             return Token.NL
 
         if self.new_indentation < self.indentation:
@@ -110,30 +110,7 @@ class Lexer:
                 return Token.NL
             return Token.EOF
 
-        if self.lastchar.isalpha() or self.lastchar.isdigit():
-            self.buffer = ""
-            while self.lastchar != '\n' and self.lastchar != '\x00':
-                if self.lastchar == ':':
-                    self.nextchar()
-                    if self.lastchar == ' ' or self.lastchar == '\n' or self.lastchar == '\x00':
-                        self.unget()
-                        break
-                self.buffer += self.lastchar
-                self.nextchar()
-
-            if self.buffer in _keywords:
-                return _keywordsToken[_keywords.index(self.buffer)]
-
-            # use regex to find subtype of string
-            if re.match(r"^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$", self.buffer) != None:
-                return Token.NUMBER
-
-            #if re.match(r"^([0-9]{2,5})+(:([0-9]{2,5}))?$", self.buffer) != None:
-            #    return Token.STRING_PORT
-
-            return Token.STRING
-
-        elif self.lastchar == '"':
+        if self.lastchar == '"':
             self.nextchar()
             self.buffer = ""
             while self.lastchar != '"' and self.lastchar != "\x00":
@@ -164,6 +141,30 @@ class Lexer:
             tmp = Token.DASH
         elif self.lastchar == ' ':
             tmp = Token.SPACE
+        else:
+            #if self.lastchar.isalpha() or self.lastchar.isdigit():
+            self.buffer = ""
+            while self.lastchar != '\n' and self.lastchar != '\x00':
+                if self.lastchar == ':':
+                    self.nextchar()
+                    if self.lastchar == ' ' or self.lastchar == '\n' or self.lastchar == '\x00':
+                        self.unget()
+                        break
+                self.buffer += self.lastchar
+                self.nextchar()
+
+            if self.buffer in _keywords:
+                return _keywordsToken[_keywords.index(self.buffer)]
+
+            # use regex to find subtype of string
+            if re.match(r"^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$", self.buffer) != None:
+                return Token.NUMBER
+
+            #if re.match(r"^([0-9]{2,5})+(:([0-9]{2,5}))?$", self.buffer) != None:
+            #    return Token.STRING_PORT
+
+            return Token.STRING
+
 
         self.nextchar()
         return tmp
