@@ -1,19 +1,20 @@
-from lexer import *
+from lexer import Lexer
 from _parser import Parser
 
-test = 'version: "3.9"\nservices: \n  test:\n    image: costam\n'
+class Colors:
+    OKGREEN = '\033[92m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+test = open('compose.yaml',mode='r').read()
 
 lex = Lexer(test)
 
 par = Parser(lex)
 
-par.root()
-print("Valid!")
-
-'''tok = Token.UNKNOWN
-
-while tok != Token.EOF:
-    tok = lex.gettoken()
-    print(tok.name)
-
-'''
+try:
+    par.root()
+    print(f"{Colors.OKGREEN}Valid!{Colors.ENDC}")
+except Exception as e:
+    print(e.args[0])
+    print(f"{Colors.FAIL}Not valid!{Colors.ENDC}")

@@ -2,47 +2,41 @@ from enum import Enum
 import re
 from collections import namedtuple
 
-TokenTuple = namedtuple('TokenTuple', 'type line col')
+TokenTuple = namedtuple('TokenTuple', 'type line col buf')
+
 
 class Token(Enum):
     EOF = -1
     UNKNOWN = 0
 
     NL = 1
-    SPACE = 18
-    COLON = 2
-    DASH = 3
+    SPACE = 2
+    COLON = 3
+    DASH = 4
 
-    STRING = 4
-    #ID = 5
-    NUMBER = 6
+    STRING = 5
+    STRING_PORT = 6
+    STRING_VERSION = 7
+    NUMBER = 8
 
-    VERSION = 7
-    SERVICES = 8
-    BUILD = 9
-    PORTS = 10
-    IMAGE = 11
-    VOLUMES = 12
-    ENVIROMENT = 13
-    NETWORKS = 14
-    DEPLOY = 15
+    VERSION = 9
+    SERVICES = 10
+    BUILD = 11
+    PORTS = 12
+    IMAGE = 13
+    VOLUMES = 14
+    ENVIRONMENT = 15
+    NETWORKS = 16
+    DEPLOY = 17
 
-    INDENT = 16
-    DEDENT = 17
-    STRING_PORT = 22
-    STRING_VERSION = 23
+    INDENT = 18
+    DEDENT = 19
 
 
 _keywords = ["version", "services", "build", "ports",
-             "image", "volumes", "enviroment", "networks", "deploy"]
+             "image", "volumes", "environment", "networks", "deploy"]
 _keywordsToken = [Token.VERSION, Token.SERVICES, Token.BUILD, Token.PORTS,
-                  Token.IMAGE, Token.VOLUMES, Token.ENVIROMENT, Token.NETWORKS, Token.DEPLOY]
-'''_keywords = []
-_keywordsToken = []'''
-
-
-def is_keyword(token):
-    return token in _keywordsToken
+                  Token.IMAGE, Token.VOLUMES, Token.ENVIRONMENT, Token.NETWORKS, Token.DEPLOY]
 
 
 class Lexer:
@@ -57,6 +51,8 @@ class Lexer:
         self.indentation = 0
         self.new_indentation = 0
         self.indents = [0]
+        self.startline = 1
+        self.startcol = 1
         self.nextchar()
 
     def nextchar(self):
@@ -76,18 +72,19 @@ class Lexer:
 
     def unget(self):
         self.index -= 2
-        self.col -= 2
+        if self.lastchar == '\n':
+            self.line -= 1
+        else:
+            self.col -= 2
         self.nextchar()
 
     def gettoken(self):
-        return TokenTuple(type=self._gettoken(), line=self.line, col=self.col)
+        return TokenTuple(type=self._gettoken(), line=self.startline, col=self.startcol, buf=self.buffer)
 
     def _gettoken(self):
 
-        if self.new_indentation > self.indentation:
-            self.indents.append(self.new_indentation - self.indentation)
-            self.indentation = self.new_indentation
-            return Token.INDENT
+        self.startline = self.line
+        self.startcol = self.col - 1
 
         if self.lastchar == "\n":
             self.new_indentation = 0
@@ -95,7 +92,15 @@ class Lexer:
                 self.new_indentation += 1
             if self.lastchar == '\n':
                 return self._gettoken()
+            if self.lastchar == '\x00':
+                self.new_indentation = 0
+                return self._gettoken()
             return Token.NL
+
+        if self.new_indentation > self.indentation:
+            self.indents.append(self.new_indentation - self.indentation)
+            self.indentation = self.new_indentation
+            return Token.INDENT
 
         if self.new_indentation < self.indentation:
             size = self.indents.pop()
@@ -122,15 +127,14 @@ class Lexer:
 
             self.nextchar()
 
+            # use regex to find subtype of string
+
             if re.match(r"^([0-9]{2,5})+(:([0-9]{2,5}))?$", self.buffer) != None:
                 return Token.STRING_PORT
 
-            if re.match(r"^[1-3]+(\.\d+)?$", self.buffer) != None:
+            elif re.match(r"^[1-3]+(\.\d+)?$", self.buffer) != None:
                 return Token.STRING_VERSION
 
-            # use regex to find subtype of string
-
-            
             return Token.STRING
 
         tmp = Token.UNKNOWN
@@ -142,7 +146,6 @@ class Lexer:
         elif self.lastchar == ' ':
             tmp = Token.SPACE
         else:
-            #if self.lastchar.isalpha() or self.lastchar.isdigit():
             self.buffer = ""
             while self.lastchar != '\n' and self.lastchar != '\x00':
                 if self.lastchar == ':':
@@ -160,11 +163,7 @@ class Lexer:
             if re.match(r"^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$", self.buffer) != None:
                 return Token.NUMBER
 
-            #if re.match(r"^([0-9]{2,5})+(:([0-9]{2,5}))?$", self.buffer) != None:
-            #    return Token.STRING_PORT
-
             return Token.STRING
-
 
         self.nextchar()
         return tmp
