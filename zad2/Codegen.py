@@ -205,6 +205,14 @@ class Codegen(CalcVisitor):
         self.builder.position_at_start(w_after_block)
 
 
+
+    def visitBlock(self, ctx:CalcParser.BlockContext):
+        statements = []
+        for stm in ctx.children:
+            if not hasattr(stm, 'symbol'):
+                statements.append(self.visit(stm))
+        return statements
+
     def visitDeclaration(self, ctx:CalcParser.DeclarationContext):
         value = self.visit(ctx.value)        
         
@@ -213,6 +221,14 @@ class Codegen(CalcVisitor):
 
         self.builder.store(value, ptr)
 
+    def visitExpression(self, ctx:CalcParser.ExpressionContext):
+        return self.visit(ctx.children[0])
+
+    def visitReturn(self, ctx:CalcParser.ReturnContext):
+        if ctx.value is None:
+            self.builder.ret_void()
+        else:
+            self.builder.ret(self.visit(ctx.value))
 
     def visitBasicType(self, ctx:CalcParser.BasicTypeContext):
         name = ctx.getText()
