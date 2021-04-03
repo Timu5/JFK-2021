@@ -44,6 +44,8 @@ primary
 expr
     : left=expr op=(MULT | DIV) right=expr                  # binary
     | left=expr op=(PLUS | MINUS) right=expr                # binary
+    | left=expr op=('>' | '<' | '>=' | '<=') right=expr     # condBinary
+    | left=expr op=('==' | '!=') right=expr                 # condBinary
     |<assoc=right> cond=expr '?' truee=expr ':' falsee=expr # tenary
     |<assoc=right> left=expr op='=' right=expr              # assign
     | primary                                               # eprimary

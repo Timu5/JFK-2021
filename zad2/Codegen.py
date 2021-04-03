@@ -133,6 +133,21 @@ class Codegen(CalcVisitor):
             raise Exception("Unsuported types in binary")
 
 
+    def visitCondBinary(self, ctx:CalcParser.CondBinaryContext):
+        op = ctx.op.text
+        left = self.visit(ctx.left)
+        right = self.visit(ctx.right)
+
+        if left.type != right.type:
+            left, right = self.promote(left, right)
+
+        if isinstance(left.type, ir.IntType): 
+            return self.builder.icmp_signed(op, left, right)
+        elif isinstance(left.type, ir.FloatType):
+            return self.builder.fcmp_ordered(op, left, right)
+
+        raise Exception("Unusported type in compare")
+
         
     def visitArgs(self, ctx:CalcParser.ArgsContext):
         if ctx.children is None:
