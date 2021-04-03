@@ -159,6 +159,51 @@ class Codegen(CalcVisitor):
 
         raise Exception("Cannot assign to anything difrent than varaible")
 
+    def convert_to_i1(self, value):
+        if value.type == ir.IntType(1):
+            return value
+        if isinstance(value.type, ir.IntType):
+            return self.builder.icmp_signed("!=", value, ir.Constant(ir.IntType(32), 0))
+        elif isinstance(value.type, ir.FloatType):
+            return self.builder.fcmp_ordered("!=", value, ir.Constant(ir.FloatType(), 0.0))
+        #elif isinstance(cond.type, ir.PointerType):
+        #    pass
+        # TODO: check how to compare to NULL
+        else:
+            raise Exception("Unknown type for bool value!")
+
+    def visitConditional(self, ctx:CalcParser.ConditionalContext):
+        cond = self.visit(ctx.value)
+        cond = self.convert_to_i1(cond)
+
+        if ctx.falsee is None:
+            with self.builder.if_then(cond) as then:
+                self.visit(ctx.truee)
+        else:
+            with self.builder.if_else(cond) as (then, otherwise):
+                with then:
+                    self.visit(ctx.truee)
+                with otherwise:
+                    self.visit(ctx.falsee)
+
+    def visitLoop(self, ctx:CalcParser.LoopContext):
+        cond = self.visit(ctx.value)
+        cond = self.convert_to_i1(cond)
+
+        w_body_block = self.builder.append_basic_block("w_body")
+        w_after_block = self.builder.append_basic_block("w_after")
+
+        self.builder.cbranch(cond, w_body_block, w_after_block)
+
+        self.builder.position_at_start(w_body_block)
+        self.visit(ctx.block)
+
+        cond = self.visit(ctx.value)
+        cond = self.convert_to_i1(cond)
+        self.builder.cbranch(cond, w_body_block, w_after_block)
+
+        self.builder.position_at_start(w_after_block)
+
 
     def visitDeclaration(self, ctx:CalcParser.DeclarationContext):
         value = self.visit(ctx.value)        
