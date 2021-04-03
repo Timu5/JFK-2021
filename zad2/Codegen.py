@@ -261,6 +261,26 @@ class Codegen(CalcVisitor):
         self.builder.position_at_start(w_after_block)
 
 
+    def visitForLoop(self, ctx:CalcParser.ForLoopContext):
+        cond = self.visit(ctx.b)
+        cond = self.convert_to_i1(cond)
+
+        self.visit(ctx.a)
+
+        w_body_block = self.builder.append_basic_block("w_body")
+        w_after_block = self.builder.append_basic_block("w_after")
+
+        self.builder.cbranch(cond, w_body_block, w_after_block)
+
+        self.builder.position_at_start(w_body_block)
+        self.visit(ctx.block)
+        self.visit(ctx.c)
+
+        cond = self.visit(ctx.b)
+        cond = self.convert_to_i1(cond)
+        self.builder.cbranch(cond, w_body_block, w_after_block)
+
+        self.builder.position_at_start(w_after_block)
 
     def visitBlock(self, ctx:CalcParser.BlockContext):
         statements = []

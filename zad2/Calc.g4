@@ -56,6 +56,8 @@ statement
     | 'if' LPAREN value=expr RPAREN truee=statement 
                                  ('else' falsee=statement)? # conditional
     | 'while' LPAREN value=expr RPAREN block=statement      # loop
+    | 'for' LPAREN a=expr ';' b=expr ';' c=expr RPAREN 
+                                       block=statement      # forLoop
     | '{' statement* '}'                                    # block
     | 'let' name=IDENT ('=' value=expr)? ';'                # declaration
     | 'const' name=IDENT '=' value=expr ';'                 # const
