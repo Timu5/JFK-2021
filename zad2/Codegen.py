@@ -38,6 +38,14 @@ class Codegen(CalcVisitor):
     def visitFloat(self, ctx:CalcParser.FloatContext):
         return ir.Constant(ir.FloatType(), float(ctx.getText()))
 
+    
+    def visitVar(self, ctx:CalcParser.VarContext):
+        name = ctx.getText() 
+        if name in self.locals:
+            return self.builder.load(self.locals[name])
+
+        raise Exception("Unknown local variable")
+        
 
     def visitParenthesis(self, ctx:CalcParser.ParenthesisContext):
         return self.visit(ctx.children[1])
@@ -137,6 +145,28 @@ class Codegen(CalcVisitor):
             raise Exception("Unknown type for tenary cond!")
         
         return self.builder.select(cond, lhs, rhs)
+
+    def visitAssign(self, ctx:CalcParser.AssignContext):
+        right = self.visit(ctx.right)
+
+        if isinstance(ctx.left.children[0], CalcParser.VarContext):
+            name = ctx.left.getText()
+            if name in self.locals:        
+                self.builder.store(right, self.locals[name])
+                return
+
+            raise Exception("Undefined variable")
+
+        raise Exception("Cannot assign to anything difrent than varaible")
+
+
+    def visitDeclaration(self, ctx:CalcParser.DeclarationContext):
+        value = self.visit(ctx.value)        
+        
+        ptr = self.builder.alloca(value.type)
+        self.locals[ctx.name.text] = ptr
+
+        self.builder.store(value, ptr)
 
 
     def visitBasicType(self, ctx:CalcParser.BasicTypeContext):
