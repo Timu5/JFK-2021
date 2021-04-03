@@ -50,6 +50,35 @@ class Codegen(CalcVisitor):
         global_text.global_constant = False
         global_text.initializer = text_const
         return global_text
+
+    def visitArray(self, ctx:CalcParser.ArrayContext):
+        args = self.visit(ctx.children[1])
+        if len(args) == 0:
+            raise Exception("Cannot create empty array")
+        if any([not isinstance(a, ir.Constant) for a in args]):
+            raise Exception("Array must be built from consts!")
+        first_type = args[0].type
+        if any([not a.type == first_type for a in args]):
+            raise Exception("Array must be built from same types!")
+
+        array_type = ir.ArrayType(first_type, len(args))
+        array = ir.Constant(array_type, [x.constant for x in args])
+        ptr = self.builder.alloca(array_type)
+        self.builder.store(array, ptr)
+        
+        return ptr
+
+    def visitIndex(self, ctx:CalcParser.IndexContext):
+        primary = self.visit(ctx.children[0])
+        expr = self.visit(ctx.children[2])
+
+        if not isinstance(expr.type, ir.IntType):
+            raise Exception("Array index need to be int type!")
+
+        ptr = self.builder.gep(primary, [ir.Constant(ir.IntType(32), 0), expr])
+
+        return self.builder.load(ptr)
+
     
     def visitVar(self, ctx:CalcParser.VarContext):
         name = ctx.getText() 
