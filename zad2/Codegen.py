@@ -83,3 +83,24 @@ class Codegen(CalcVisitor):
         else:
             raise Exception("Unsuported types in binary")
 
+
+    def visitTenary(self, ctx:CalcParser.TenaryContext):
+        # cond, truee, falsee
+        cond = self.visit(ctx.cond)
+        lhs = self.visit(ctx.truee)
+        rhs = self.visit(ctx.falsee)
+
+        if lhs.type != rhs.type:
+            rhs, rhs = self.promote(lhs, rhs)
+
+        if isinstance(cond.type, ir.IntType):
+            cond = self.builder.icmp_signed("==", cond, ir.Constant(ir.IntType(32), 0))
+        elif isinstance(cond.type, ir.FloatType):
+            cond = self.builder.fcmp_ordered("==", cond, ir.Constant(ir.FloatType(), 0.0))
+        #elif isinstance(cond.type, ir.PointerType):
+        #    pass
+        # TODO: check how to compare to NULL
+        else:
+            raise Exception("Unknown type for tenary cond!")
+        
+        return self.builder.select(cond, lhs, rhs)
