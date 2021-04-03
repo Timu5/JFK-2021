@@ -84,6 +84,39 @@ class Codegen(CalcVisitor):
             raise Exception("Unsuported types in binary")
 
 
+        
+    def visitArgs(self, ctx:CalcParser.ArgsContext):
+        if ctx.children is None:
+            return []
+        args = []
+        for arg in ctx.children:
+            if not hasattr(arg, 'symbol'):
+                args.append(self.visit(arg))
+        return args
+
+    def visitCall(self, ctx:CalcParser.BinaryContext):
+        name = ctx.name.text
+        args = self.visit(ctx.arguments)
+
+        fn = self.module.get_global(name)
+        # TODO: check if function and if fn exist
+
+        if len(fn.args) != len(args):
+            if not (fn.ftype.var_arg and len(fn.args) < len(args)):
+                raise Exception("Wrong args number!")
+        
+        irargs = []
+        for arg in args:
+            arg_llvm = arg#.accept(self)
+            if isinstance(arg_llvm.type, ir.PointerType):
+                arg_llvm = self.builder.bitcast(arg_llvm, ir.IntType(8).as_pointer())
+            elif fn.ftype.var_arg and isinstance(arg_llvm.type, ir.FloatType):
+                arg_llvm = self.builder.fpext(arg_llvm, ir.DoubleType())
+
+            irargs.append(arg_llvm)
+        
+        return self.builder.call(fn, irargs)
+
     def visitTenary(self, ctx:CalcParser.TenaryContext):
         # cond, truee, falsee
         cond = self.visit(ctx.cond)
@@ -104,3 +137,42 @@ class Codegen(CalcVisitor):
             raise Exception("Unknown type for tenary cond!")
         
         return self.builder.select(cond, lhs, rhs)
+
+
+    def visitBasicType(self, ctx:CalcParser.BasicTypeContext):
+        name = ctx.getText()
+
+        if name == "int":
+            return ir.IntType(32)
+        elif name == "byte":
+            return ir.IntType(8)
+        elif name == "short":
+            return ir.IntType(16)
+        elif name == "float":
+            return ir.FloatType()
+        
+        raise Exception("Unknown type")
+
+    def visitPointerType(self, ctx:CalcParser.PointerTypeContext):
+        typ = self.visit(ctx.children[0])
+        return typ.as_pointer()
+
+    def visitArrayType(self, ctx:CalcParser.ArrayTypeContext):
+        # TODO: Save somewhere info that this is array
+        typ = self.visit(ctx.children[0])
+        return typ.as_pointer()
+
+    def visitFnargs(self, ctx:CalcParser.FnargsContext):
+        args = []
+        for arg in ctx.children:
+            if not hasattr(arg, 'symbol'):
+                args.append(self.visit(arg))
+        return args
+
+    def visitExtern(self, ctx:CalcParser.ExternContext):
+        retval = self.visit(ctx.rettype)
+        name = ctx.name.text
+        args = self.visit(ctx.arguments)
+        varargs = not ctx.varargs is None
+        fn_ty = ir.FunctionType(retval, args, var_arg=varargs)
+        ir.Function(self.module, fn_ty, name=name)
