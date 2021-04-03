@@ -10,8 +10,12 @@ class Codegen(CalcVisitor):
         self.builder = None
         self.module = None
         #self.printf = None
+        self.counter = 0
         self.locals = {}
 
+    def get_uniq(self):
+        self.counter += 1
+        return self.counter
 
     def gen_ir(self, node):
         # Create an empty module...
@@ -38,6 +42,14 @@ class Codegen(CalcVisitor):
     def visitFloat(self, ctx:CalcParser.FloatContext):
         return ir.Constant(ir.FloatType(), float(ctx.getText()))
 
+    def visitString(self, ctx:CalcParser.StringContext):
+        text = ctx.getText()[1:-1].encode('utf-8').decode('unicode_escape') + "\x00"
+        text_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(text)), bytearray(text.encode("utf8")))
+        global_text = ir.GlobalVariable(self.module, text_const.type, name=".str."+str(self.get_uniq()))
+        global_text.linkage = 'internal'
+        global_text.global_constant = False
+        global_text.initializer = text_const
+        return global_text
     
     def visitVar(self, ctx:CalcParser.VarContext):
         name = ctx.getText() 
