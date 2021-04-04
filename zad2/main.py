@@ -1,5 +1,5 @@
 from antlr4 import *
-from ctypes import CFUNCTYPE, c_double, c_int
+from ctypes import CFUNCTYPE, c_double, c_int, POINTER
 from generated.CalcLexer import CalcLexer
 from generated.CalcParser import CalcParser
 
@@ -23,10 +23,10 @@ def exec(module):
     engine.finalize_object()
     engine.run_static_constructors()
 
-    func_ptr = engine.get_function_address("start")
+    func_ptr = engine.get_function_address("main")
 
-    cFunc = CFUNCTYPE(None)(func_ptr)
-    cFunc()
+    cFunc = CFUNCTYPE(c_int, c_int, POINTER(c_int))(func_ptr)
+    cFunc(0, None)
 
 def magic(txt):
     lexer = CalcLexer(InputStream(txt))

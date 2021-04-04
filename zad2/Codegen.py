@@ -3,6 +3,7 @@ from antlr4 import *
 from generated.CalcLexer import CalcLexer
 from generated.CalcVisitor import CalcVisitor
 from generated.CalcParser import CalcParser
+import re
 
 class Codegen(CalcVisitor):
 
@@ -24,15 +25,15 @@ class Codegen(CalcVisitor):
         #printf_ty = ir.FunctionType(ir.IntType(32), [ir.IntType(8).as_pointer()], var_arg=True)
         #self.printf = ir.Function(self.module, printf_ty, name="printf")
 
-        fnty = ir.FunctionType(ir.VoidType(), [])
-        func = ir.Function(self.module, fnty, name="start")
+        #fnty = ir.FunctionType(ir.VoidType(), [])
+        #func = ir.Function(self.module, fnty, name="start")
 
         # Now implement the function
-        block = func.append_basic_block(name="entry")
-        self.builder = ir.IRBuilder(block)
+        #block = func.append_basic_block(name="entry")
+        #self.builder = ir.IRBuilder(block)
 
         self.visit(node)
-        self.builder.ret_void()
+        #self.builder.ret_void()
 
         return self.module
 
@@ -100,6 +101,8 @@ class Codegen(CalcVisitor):
         else:
             raise Exception("Wrong type to promote!")
         return left, right
+
+    
 
     def visitBinary(self, ctx:CalcParser.BinaryContext):
         op = ctx.op.type
@@ -330,11 +333,52 @@ class Codegen(CalcVisitor):
         return typ.as_pointer()
 
     def visitFnargs(self, ctx:CalcParser.FnargsContext):
+        if ctx.children is None:
+            return []
         args = []
         for arg in ctx.children:
             if not hasattr(arg, 'symbol'):
                 args.append(self.visit(arg))
         return args
+
+    def visitFnargsnamed(self, ctx:CalcParser.FnargsnamedContext):
+        if ctx.children is None:
+            return [], []
+        args = []
+        args_names = []
+        for i, arg in enumerate(ctx.children):
+            if i % 3 == 0:
+                args.append(self.visit(arg))
+            if i % 3 == 1:
+                args_names.append(arg.getText())
+        return args, args_names
+
+    def visitFunction(self, ctx:CalcParser.FunctionContext):
+        retval = self.visit(ctx.rettype)
+        name = ctx.name.text
+        args, args_names = self.visit(ctx.arguments)
+        varargs = not ctx.varargs is None
+        fn_ty = ir.FunctionType(retval, args, var_arg=varargs)
+        func = ir.Function(self.module, fn_ty, name=name)
+
+        block = func.append_basic_block(name="entry")
+        self.builder = ir.IRBuilder(block)
+
+        self.locals = {}
+
+        for index, value in enumerate(func.args):
+            atype = args[index]
+            aname = args_names[index]
+            ptr = self.builder.alloca(atype)
+            self.locals[aname] = ptr
+            self.builder.store(value, ptr)     
+
+        self.visit(ctx.block)
+
+        # TODO: detect missing return!
+
+        self.locals = None
+        self.builder = None
 
     def visitExtern(self, ctx:CalcParser.ExternContext):
         retval = self.visit(ctx.rettype)

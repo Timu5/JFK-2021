@@ -20,9 +20,9 @@ LPAREN: '(';
 RPAREN: ')';
 COMMA : ',';
 
-vtype: IDENT           # basicType
-    | vtype '*'        # pointerType
-    | vtype ('[' ']')  # arrayType
+vtype: IDENT         # basicType
+    | vtype '*'      # pointerType
+    | vtype '[' ']'  # arrayType
     ;
 
 args: (expr (COMMA expr)*)?;
@@ -66,10 +66,12 @@ statement
 
 fnargs: (vtype (COMMA vtype)*)?;
 
+fnargsnamed: (vtype IDENT (COMMA vtype IDENT)*)?;
+
 function
-    : 'fn' name=IDENT LPAREN arguments=fnargs RPAREN block=statement;
+    : 'fn' rettype=vtype name=IDENT LPAREN arguments=fnargsnamed (COMMA varargs='...')? RPAREN block=statement;
 
 extern
     : 'extern' rettype=vtype name=IDENT LPAREN arguments=fnargs (COMMA varargs='...')? RPAREN ';';
 
-program: (function | statement | extern)*;
+program: (function | extern)*;
