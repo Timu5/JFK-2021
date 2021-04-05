@@ -39,6 +39,8 @@ primary
     | LPAREN expr RPAREN                                    # parenthesis
     | primary '.' IDENT                                     # member
     | primary '[' expr ']'                                  # index
+    | '&' name=IDENT                                        # address
+    | '*' name=IDENT                                        # deref
     ;
 
 expr

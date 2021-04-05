@@ -43,6 +43,14 @@ class Codegen(CalcVisitor):
     def visitFloat(self, ctx:CalcParser.FloatContext):
         return ir.Constant(ir.FloatType(), float(ctx.getText()))
 
+    def visitAddress(self, ctx:CalcParser.AddressContext):
+        name = ctx.name.text
+        return self.getVar(name)
+
+    def visitDeref(self, ctx:CalcParser.DerefContext):
+        name = ctx.name.text
+        return self.builder.load(self.builder.load(self.getVar(name)))
+
     def visitString(self, ctx:CalcParser.StringContext):
         text = ctx.getText()[1:-1].encode('utf-8').decode('unicode_escape') + "\x00"
         text_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(text)), bytearray(text.encode("utf8")))
@@ -81,17 +89,35 @@ class Codegen(CalcVisitor):
         return self.builder.load(ptr)
 
     
+    def getVar(self, name):
+        if name in self.locals:
+            return self.locals[name]
+
+        var = self.module.get_global(name)
+        if not var is None:
+            # TODO: check how this works with arrays and strings
+            return var
+
+        raise Exception("Unknown variable")
+
+    
     def visitVar(self, ctx:CalcParser.VarContext):
         name = ctx.getText() 
-        if name in self.locals:
+        '''if name in self.locals:
             return self.builder.load(self.locals[name])
 
         var = self.module.get_global(name)
         if not var is None:
             # TODO: check how this works with arrays and strings
-            return self.builder.load(var)
+            return self.builder.load(var)'''
 
-        raise Exception("Unknown variable")
+        var = self.getVar(name)
+
+        if isinstance(var, ir.GlobalVariable):
+            if isinstance(var.value_type, ir.ArrayType):
+                return var
+
+        return self.builder.load(var)
         
 
     def visitParenthesis(self, ctx:CalcParser.ParenthesisContext):
