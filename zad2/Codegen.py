@@ -10,7 +10,6 @@ class Codegen(CalcVisitor):
     def __init__(self):
         self.builder = None
         self.module = None
-        #self.printf = None
         self.counter = 0
         self.locals = {}
 
@@ -19,21 +18,9 @@ class Codegen(CalcVisitor):
         return self.counter
 
     def gen_ir(self, node):
-        # Create an empty module...
         self.module = ir.Module(name="my_super_modul")
 
-        #printf_ty = ir.FunctionType(ir.IntType(32), [ir.IntType(8).as_pointer()], var_arg=True)
-        #self.printf = ir.Function(self.module, printf_ty, name="printf")
-
-        #fnty = ir.FunctionType(ir.VoidType(), [])
-        #func = ir.Function(self.module, fnty, name="start")
-
-        # Now implement the function
-        #block = func.append_basic_block(name="entry")
-        #self.builder = ir.IRBuilder(block)
-
         self.visit(node)
-        #self.builder.ret_void()
 
         return self.module
 
@@ -105,14 +92,7 @@ class Codegen(CalcVisitor):
 
     
     def visitVar(self, ctx:CalcParser.VarContext):
-        name = ctx.getText() 
-        '''if name in self.locals:
-            return self.builder.load(self.locals[name])
-
-        var = self.module.get_global(name)
-        if not var is None:
-            # TODO: check how this works with arrays and strings
-            return self.builder.load(var)'''
+        name = ctx.getText()
 
         var = self.getVar(name)
 
