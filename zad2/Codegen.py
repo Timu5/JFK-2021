@@ -54,6 +54,8 @@ class Codegen(CalcVisitor):
     def visitString(self, ctx:CalcParser.StringContext):
         text = ctx.getText()[1:-1].encode('utf-8').decode('unicode_escape') + "\x00"
         text_const = ir.Constant(ir.ArrayType(ir.IntType(8), len(text)), bytearray(text.encode("utf8")))
+        if self.builder is None:
+            return text_const
         global_text = ir.GlobalVariable(self.module, text_const.type, name=".str."+str(self.get_uniq()))
         global_text.linkage = 'internal'
         global_text.global_constant = False
@@ -72,9 +74,10 @@ class Codegen(CalcVisitor):
 
         array_type = ir.ArrayType(first_type, len(args))
         array = ir.Constant(array_type, [x.constant for x in args])
+        if self.builder is None:
+            return array
         ptr = self.builder.alloca(array_type)
         self.builder.store(array, ptr)
-        
         return ptr
 
     def visitIndex(self, ctx:CalcParser.IndexContext):
