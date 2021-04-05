@@ -64,6 +64,8 @@ statement
     | 'return' (value=expr)? ';'                            # return
     ;
 
+globalVar: 'let' name=IDENT ('=' value=expr)? ';';
+
 fnargs: (vtype (COMMA vtype)*)?;
 
 fnargsnamed: (vtype IDENT (COMMA vtype IDENT)*)?;
@@ -74,4 +76,4 @@ function
 extern
     : 'extern' rettype=vtype name=IDENT LPAREN arguments=fnargs (COMMA varargs='...')? RPAREN ';';
 
-program: (function | extern)*;
+program: (function | extern | globalVar)*;

@@ -86,7 +86,12 @@ class Codegen(CalcVisitor):
         if name in self.locals:
             return self.builder.load(self.locals[name])
 
-        raise Exception("Unknown local variable")
+        var = self.module.get_global(name)
+        if not var is None:
+            # TODO: check how this works with arrays and strings
+            return self.builder.load(var)
+
+        raise Exception("Unknown variable")
         
 
     def visitParenthesis(self, ctx:CalcParser.ParenthesisContext):
@@ -212,11 +217,12 @@ class Codegen(CalcVisitor):
             name = ctx.left.getText()
             if name in self.locals:        
                 self.builder.store(right, self.locals[name])
-                return
+                return right
 
             raise Exception("Undefined variable")
 
-        raise Exception("Cannot assign to anything difrent than varaible")
+        raise Exception("Cannot assign to anything difrent than varaible")        
+
 
     def convert_to_i1(self, value):
         if value.type == ir.IntType(1):
@@ -308,6 +314,20 @@ class Codegen(CalcVisitor):
             self.builder.ret_void()
         else:
             self.builder.ret(self.visit(ctx.value))
+
+    def visitGlobalVar(self, ctx:CalcParser.GlobalVarContext):
+        value = self.visit(ctx.value)
+
+        # TODO: add possibility to take global_variable
+        if not isinstance(value, ir.Constant):
+            raise Exception("Global vars need to be const!")
+
+        # TODO: check global name redefinition!
+        global_var = ir.GlobalVariable(self.module, value.type, name=ctx.name.text)
+        global_var.global_constant = False
+        global_var.initializer = value
+
+        return global_var
 
     def visitBasicType(self, ctx:CalcParser.BasicTypeContext):
         name = ctx.getText()
