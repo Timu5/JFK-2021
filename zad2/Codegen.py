@@ -259,15 +259,12 @@ class Codegen(CalcVisitor):
     def visitAssign(self, ctx: CalcParser.AssignContext):
         right = self.visit(ctx.right)
 
-        if isinstance(ctx.left.children[0], CalcParser.VarContext):
-            name = ctx.left.getText()
-            if name in self.locals:
-                self.builder.store(right, self.locals[name])
-                return right
+        left = self.visit(ctx.left)
+        if isinstance(left, ir.LoadInstr):
+            left = left.operands[0]
 
-            raise Exception("Undefined variable")
-
-        raise Exception("Cannot assign to anything difrent than varaible")
+        self.builder.store(right, left)
+        return right
 
     def convert_to_i1(self, value):
         if value.type == ir.IntType(1):
