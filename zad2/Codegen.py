@@ -94,6 +94,7 @@ class Codegen(CalcVisitor):
 
         if isinstance(primary, ir.LoadInstr):
             primary = primary.operands[0]
+            self.builder.block.instructions.pop()
 
         ptr = self.builder.gep(primary, [ir.Constant(
             ir.IntType(32), 0), ir.Constant(ir.IntType(32), idx)])
@@ -262,6 +263,7 @@ class Codegen(CalcVisitor):
         left = self.visit(ctx.left)
         if isinstance(left, ir.LoadInstr):
             left = left.operands[0]
+            self.builder.block.instructions.pop()
 
         self.builder.store(right, left)
         return right
