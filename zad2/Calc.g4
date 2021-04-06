@@ -35,6 +35,7 @@ primary
     | STRING                                                # string
     | IDENT                                                 # var
     | '[' args ']'                                          # array
+    | name=IDENT '{' args '}'                               # structVal
     | name=IDENT LPAREN arguments=args RPAREN               # call
     | LPAREN expr RPAREN                                    # parenthesis
     | primary '.' IDENT                                     # member
@@ -78,4 +79,8 @@ function
 extern
     : 'extern' rettype=vtype name=IDENT LPAREN arguments=fnargs (COMMA varargs='...')? RPAREN ';';
 
-program: (function | extern | globalVar)*;
+structMember: membertype=vtype name=IDENT;
+structMembers: structMember (COMMA structMember)? ;
+struct: 'struct' name=IDENT '{' members=structMembers '}';
+
+program: (function | extern | globalVar | struct)*;

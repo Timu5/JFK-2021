@@ -13,6 +13,7 @@ class Codegen(CalcVisitor):
         self.module = None
         self.counter = 0
         self.locals = {}
+        self.structs = {}
 
     def get_uniq(self):
         self.counter += 1
@@ -82,6 +83,22 @@ class Codegen(CalcVisitor):
 
         return self.builder.load(ptr)
 
+    def visitMember(self, ctx: CalcParser.MemberContext):
+        primary = self.visit(ctx.children[0])  # maybe dont pull whole object?
+        name = ctx.children[2].getText()
+        struct_name = primary.type.name
+        struct = self.structs[struct_name]
+        idx = next(i for i, v in enumerate(struct)
+                   if (lambda x: x[0] == name)(v))
+        # TODO: handle exception
+
+        if isinstance(primary, ir.LoadInstr):
+            primary = primary.operands[0]
+
+        ptr = self.builder.gep(primary, [ir.Constant(
+            ir.IntType(32), 0), ir.Constant(ir.IntType(32), idx)])
+        return self.builder.load(ptr)
+
     def getVar(self, name):
         if name in self.locals:
             return self.locals[name]
@@ -106,6 +123,26 @@ class Codegen(CalcVisitor):
 
     def visitParenthesis(self, ctx: CalcParser.ParenthesisContext):
         return self.visit(ctx.children[1])
+
+    def visitStructVal(self, ctx: CalcParser.StructValContext):
+        name = ctx.name.text
+
+        if not name in self.structs:
+            raise Exception("Not struct with this name!")
+
+        vtype = self.module.context.get_identified_type(name)
+
+        args = self.visit(ctx.children[2])
+        if len(args) == 0:
+            raise Exception("Cannot create empty struct")
+        if any([not isinstance(a, ir.Constant) for a in args]):
+            raise Exception("Struct must be built from consts!")
+
+        if any([not a.type == b for a, b in zip(args, vtype.elements)]):
+            raise Exception("Types mismatch!")
+
+        struct = ir.Constant(vtype, [x.constant for x in args])
+        return struct
 
     def promote(self, left, right):
         # TODO: Add difrent types and make this more generic
@@ -356,6 +393,8 @@ class Codegen(CalcVisitor):
             return ir.FloatType()
         elif name == "void":
             return ir.VoidType()
+        elif name in self.structs:
+            return self.module.context.get_identified_type(name)
 
         raise Exception("Unknown type")
 
@@ -429,3 +468,29 @@ class Codegen(CalcVisitor):
         varargs = not ctx.varargs is None
         fn_ty = ir.FunctionType(retval, args, var_arg=varargs)
         ir.Function(self.module, fn_ty, name=name)
+
+    def visitStructMember(self, ctx: CalcParser.StructMemberContext):
+        vtype = self.visit(ctx.membertype)
+        name = ctx.name.text
+        return name, vtype
+
+    def visitStructMembers(self, ctx: CalcParser.StructMembersContext):
+        if ctx.children is None:
+            return []
+        members = []
+        for member in ctx.children:
+            if not hasattr(member, 'symbol'):
+                members.append(self.visit(member))
+        return members
+
+    def visitStruct(self, ctx: CalcParser.StructContext):
+        name = ctx.name.text
+        members = self.visit(ctx.members)
+
+        if name in self.structs:
+            raise Exception("Struct redefinition!")
+
+        self.structs[name] = members
+        b = self.module.context.get_identified_type(name)
+        ir.LiteralStructType
+        b.set_body(*[x[1] for x in members])
