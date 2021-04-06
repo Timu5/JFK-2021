@@ -317,10 +317,16 @@ class Codegen(CalcVisitor):
         return self.visit(ctx.children[0])
 
     def visitReturn(self, ctx: CalcParser.ReturnContext):
+        rtype = self.builder.function.ftype.return_type
         if ctx.value is None:
+            if not isinstance(rtype, ir.VoidType):
+                raise Exception("Return need to have value!")
             self.builder.ret_void()
         else:
-            self.builder.ret(self.visit(ctx.value))
+            value = self.visit(ctx.value)
+            if value.type != rtype:
+                raise Exception("Return need to have same type as function!")
+            self.builder.ret(value)
 
     def visitGlobalVar(self, ctx: CalcParser.GlobalVarContext):
         value = self.visit(ctx.value)
@@ -348,6 +354,8 @@ class Codegen(CalcVisitor):
             return ir.IntType(16)
         elif name == "float":
             return ir.FloatType()
+        elif name == "void":
+            return ir.VoidType()
 
         raise Exception("Unknown type")
 
@@ -402,6 +410,12 @@ class Codegen(CalcVisitor):
             self.builder.store(value, ptr)
 
         self.visit(ctx.block)
+
+        if len(self.builder.block.instructions) == 0 or not isinstance(self.builder.block.instructions[-1], ir.Ret):
+            if isinstance(func.ftype.return_type, ir.VoidType):
+                self.builder.ret_void()
+            else:
+                raise Exception("Missing return!")
 
         # TODO: detect missing return!
 
