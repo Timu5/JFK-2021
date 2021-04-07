@@ -20,9 +20,9 @@ LPAREN: '(';
 RPAREN: ')';
 COMMA : ',';
 
-vtype: IDENT         # basicType
-    | vtype '*'      # pointerType
-    | vtype '[' ']'  # arrayType
+vtype: IDENT                     # basicType
+    | vtype '*'                  # pointerType
+    | vtype '[' (size=INT)? ']'  # arrayType
     ;
 
 args: (expr (COMMA expr)*)?;
@@ -36,6 +36,7 @@ primary
     | IDENT                                                 # var
     | '[' args ']'                                          # array
     | name=IDENT '{' args '}'                               # structVal
+    | 'cast' '(' vtype ')' primary                          # cast
     | name=IDENT LPAREN arguments=args RPAREN               # call
     | LPAREN expr RPAREN                                    # parenthesis
     | primary '.' IDENT                                     # member
@@ -83,4 +84,4 @@ structMember: membertype=vtype name=IDENT;
 structMembers: structMember (COMMA structMember)? ;
 struct: 'struct' name=IDENT '{' members=structMembers '}';
 
-program: (function | extern | globalVar | struct)*;
+program: (function | extern | globalVar | struct)* EOF;
