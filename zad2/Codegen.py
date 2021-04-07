@@ -343,12 +343,23 @@ class Codegen(CalcVisitor):
         return statements
 
     def visitDeclaration(self, ctx: CalcParser.DeclarationContext):
-        value = self.visit(ctx.value)
+        if ctx.vartype is None and ctx.value is None:
+            raise CodegenException(ctx.start, "variable need a type!")
 
-        ptr = self.builder.alloca(value.type)
-        self.locals[ctx.name.text] = ptr
+        if ctx.vartype is None:
+            value = self.visit(ctx.value)
+            ptr = self.builder.alloca(value.type)
+            self.locals[ctx.name.text] = ptr
+            self.builder.store(value, ptr)
+            return
 
-        self.builder.store(value, ptr)
+        # TODO: make this more usable
+        vartype = self.visit(ctx.vartype)
+        ptra = self.builder.alloca(vartype)
+        ptrb = self.builder.alloca(ptra.type)
+        self.builder.store(ptra, ptrb)
+        self.locals[ctx.name.text] = ptrb
+        
 
     def visitExpression(self, ctx: CalcParser.ExpressionContext):
         return self.visit(ctx.children[0])

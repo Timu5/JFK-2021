@@ -63,7 +63,7 @@ statement
     | 'for' LPAREN a=expr ';' b=expr ';' c=expr RPAREN 
                                        block=statement      # forLoop
     | '{' statement* '}'                                    # block
-    | 'let' name=IDENT ('=' value=expr)? ';'                # declaration
+    | 'let' name=IDENT (':' vartype=vtype)? ('=' value=expr)? ';' # declaration
     | 'const' name=IDENT '=' value=expr ';'                 # const
     | 'return' (value=expr)? ';'                            # return
     ;
