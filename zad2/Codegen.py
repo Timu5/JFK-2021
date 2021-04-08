@@ -63,14 +63,14 @@ class Codegen(CalcVisitor):
     def visitArray(self, ctx: CalcParser.ArrayContext):
         args = self.visit(ctx.children[1])
         if len(args) == 0:
-            raise CodegenException(ctx.start, "Cannot create empty array")
+            raise CodegenException(ctx.start, "cannot create empty array")
         if any([not isinstance(a, ir.Constant) for a in args]):
             raise CodegenException(
-                ctx.start, "Array must be built from consts!")
+                ctx.start, "array must be built from consts!")
         first_type = args[0].type
         if any([not a.type == first_type for a in args]):
             raise CodegenException(
-                ctx.start, "Array must be built from same types!")
+                ctx.start, "array must be built from same types!")
 
         array_type = ir.ArrayType(first_type, len(args))
         array = ir.Constant(array_type, [x.constant for x in args])
@@ -86,7 +86,7 @@ class Codegen(CalcVisitor):
 
         if not isinstance(expr.type, ir.IntType):
             raise CodegenException(
-                ctx.start, "Array index need to be int type!")
+                ctx.start, "array index need to be int type!")
 
         ptr = self.builder.gep(primary, [ir.Constant(ir.IntType(32), 0), expr])
         return self.builder.load(ptr)
@@ -117,7 +117,7 @@ class Codegen(CalcVisitor):
             # TODO: check how this works with arrays and strings
             return var
 
-        raise CodegenException(ctx.start, "Unknown variable")
+        raise CodegenException(ctx.start, "unknown variable")
 
     def visitVar(self, ctx: CalcParser.VarContext):
         name = ctx.getText()
@@ -136,19 +136,19 @@ class Codegen(CalcVisitor):
         name = ctx.name.text
 
         if not name in self.structs:
-            raise CodegenException(ctx.start, "Not struct with this name!")
+            raise CodegenException(ctx.start, "no struct with this name!")
 
         vtype = self.module.context.get_identified_type(name)
 
         args = self.visit(ctx.children[2])
         if len(args) == 0:
-            raise CodegenException(ctx.start, "Cannot create empty struct")
+            raise CodegenException(ctx.start, "cannot create empty struct")
         if any([not isinstance(a, ir.Constant) for a in args]):
             raise CodegenException(
-                ctx.start, "Struct must be built from consts!")
+                ctx.start, "struct must be built from consts!")
 
         if any([not a.type == b for a, b in zip(args, vtype.elements)]):
-            raise CodegenException(ctx.start, "Types mismatch!")
+            raise CodegenException(ctx.start, "types mismatch!")
 
         struct = ir.Constant(vtype, [x.constant for x in args])
         return struct
@@ -160,7 +160,7 @@ class Codegen(CalcVisitor):
         elif isinstance(right.type, ir.IntType) and isinstance(left.type, ir.FloatType):
             right = self.builder.uitofp(right, ir.FloatType())
         else:
-            raise CodegenException(ctx.start, "Wrong type to promote!")
+            raise CodegenException(ctx.start, "wrong type to promote!")
         return left, right
 
     def visitBinary(self, ctx: CalcParser.BinaryContext):
@@ -191,7 +191,7 @@ class Codegen(CalcVisitor):
             elif op == CalcLexer.DIV:
                 return self.builder.fdiv(left, right)
 
-        raise CodegenException(ctx.start, "Unsuported types in binary")
+        raise CodegenException(ctx.start, "unsuported types in binary")
 
     def visitCondBinary(self, ctx: CalcParser.CondBinaryContext):
         op = ctx.op.text
@@ -206,7 +206,7 @@ class Codegen(CalcVisitor):
         elif isinstance(left.type, ir.FloatType):
             return self.builder.fcmp_ordered(op, left, right)
 
-        raise CodegenException(ctx.start, "Unusported type in compare")
+        raise CodegenException(ctx.start, "unusported type in compare")
 
     def visitArgs(self, ctx: CalcParser.ArgsContext):
         if ctx.children is None:
@@ -280,7 +280,7 @@ class Codegen(CalcVisitor):
         #    pass
         # TODO: check how to compare to NULL
         else:
-            raise CodegenException(ctx.start, "Unknown type for bool value!")
+            raise CodegenException(ctx.start, "unknown type for bool value!")
 
     def visitConditional(self, ctx: CalcParser.ConditionalContext):
         cond = self.visit(ctx.value)
@@ -369,13 +369,13 @@ class Codegen(CalcVisitor):
         rtype = self.builder.function.ftype.return_type
         if ctx.value is None:
             if not isinstance(rtype, ir.VoidType):
-                raise CodegenException(ctx.start, "Return need to have value!")
+                raise CodegenException(ctx.start, "return need to have value!")
             self.builder.ret_void()
         else:
             value = self.visit(ctx.value)
             if value.type != rtype:
                 raise CodegenException(
-                    ctx.start, "Return need to have same type as function!")
+                    ctx.start, "return need to have same type as function!")
             self.builder.ret(value)
 
     def visitGlobalVar(self, ctx: CalcParser.GlobalVarContext):
@@ -383,7 +383,7 @@ class Codegen(CalcVisitor):
 
         # TODO: add possibility to take global_variable
         if not isinstance(value, ir.Constant):
-            raise CodegenException(ctx.start, "Global vars need to be const!")
+            raise CodegenException(ctx.start, "global vars need to be const!")
 
         # TODO: check global name redefinition!
         global_var = ir.GlobalVariable(
@@ -409,7 +409,7 @@ class Codegen(CalcVisitor):
         elif name in self.structs:
             return self.module.context.get_identified_type(name)
 
-        raise CodegenException(ctx.start, "Unknown type")
+        raise CodegenException(ctx.start, "unknown type")
 
     def visitPointerType(self, ctx: CalcParser.PointerTypeContext):
         typ = self.visit(ctx.children[0])
@@ -421,7 +421,7 @@ class Codegen(CalcVisitor):
             # TODO: Save somewhere info that this is array
             return typ.as_pointer()
         elements = int(ctx.size.text)
-        return ir.ArrayType(elements, typ)
+        return ir.ArrayType(typ, elements)
 
     def visitFnargs(self, ctx: CalcParser.FnargsContext):
         if ctx.children is None:
@@ -470,7 +470,7 @@ class Codegen(CalcVisitor):
             if isinstance(func.ftype.return_type, ir.VoidType):
                 self.builder.ret_void()
             else:
-                raise CodegenException(ctx.start, "Missing return!")
+                raise CodegenException(ctx.start, "missing return")
 
         self.locals = None
         self.builder = None
@@ -502,7 +502,7 @@ class Codegen(CalcVisitor):
         members = self.visit(ctx.members)
 
         if name in self.structs:
-            raise CodegenException(ctx.start, "Struct redefinition!")
+            raise CodegenException(ctx.start, "struct redefinition!")
 
         self.structs[name] = members
         b = self.module.context.get_identified_type(name)
