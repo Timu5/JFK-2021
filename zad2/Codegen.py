@@ -123,8 +123,8 @@ class Codegen(CalcVisitor):
         name = ctx.getText()
         var = self.getVar(name, ctx)
 
-        if isinstance(var, ir.GlobalVariable):
-            if isinstance(var.value_type, ir.ArrayType):
+        if var.type.is_pointer:
+            if isinstance(var.type.pointee, ir.ArrayType):
                 return var
 
         return self.builder.load(var)
@@ -346,21 +346,23 @@ class Codegen(CalcVisitor):
         if ctx.vartype is None and ctx.value is None:
             raise CodegenException(ctx.start, "variable need a type!")
 
-        if ctx.vartype is None and not ctx.value is None:
+        elif ctx.vartype is None and not ctx.value is None:
             value = self.visit(ctx.value)
+            if value.type.is_pointer:
+                self.locals[ctx.name.text] = value
+                return
             ptr = self.builder.alloca(value.type)
-            self.locals[ctx.name.text] = ptr
             self.builder.store(value, ptr)
+            self.locals[ctx.name.text] = ptr             
 
-        if not ctx.vartype is None and ctx.value is None:
-            # TODO: make this more usable
+        elif not ctx.vartype is None and ctx.value is None:
+            # only allocate space
             vartype = self.visit(ctx.vartype)
-            ptra = self.builder.alloca(vartype)
-            if isinstance(vartype, ir.ArrayType):
-                ptrb = self.builder.alloca(ptra.type)
-                self.builder.store(ptra, ptrb)
-                ptra = ptrb
-            self.locals[ctx.name.text] = ptra
+            ptr = self.builder.alloca(vartype)
+            self.locals[ctx.name.text] = ptr
+
+        else:
+            raise CodegenException(ctx.start, "sorry not ready yet :/")
 
     def visitExpression(self, ctx: CalcParser.ExpressionContext):
         return self.visit(ctx.children[0])
