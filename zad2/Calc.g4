@@ -29,8 +29,8 @@ args: (expr (COMMA expr)*)?;
 
 primary
     : op=(PLUS | MINUS) value=primary                       # unary
-    | INT                                                   # number
-    | FLOAT                                                 # float
+    | INT literal=IDENT?                                    # number
+    | FLOAT literal=IDENT?                                  # float
     | CHAR                                                  # char
     | STRING                                                # string
     | IDENT                                                 # var

@@ -13,6 +13,13 @@ class CodegenException(Exception):
         self.msg = msg
         super().__init__(self.msg)
 
+class SignedType(ir.IntType):
+    def __new__(cls, value, *args, **kwargs):
+        return ir.IntType.__new__(cls, value)
+
+    def __init__(self, size, signed):
+        self.is_signed = signed
+        self.is_unsigned = not signed
 
 class Codegen(CalcVisitor):
 
@@ -33,10 +40,40 @@ class Codegen(CalcVisitor):
         return self.module
 
     def visitNumber(self, ctx: CalcParser.NumberContext):
-        return ir.Constant(ir.IntType(32), int(ctx.getText()))
+        valtype = SignedType(32, True)
+        if not ctx.literal is None:
+            if ctx.literal.text == 'u':
+                valtype = SignedType(32, False)
+            elif ctx.literal.text == 'i':
+                valtype = SignedType(32, True)
+            elif ctx.literal.text == 'ul':
+                valtype = SignedType(64, False)
+            elif ctx.literal.text == 'l':
+                valtype = SignedType(64, True)
+            elif ctx.literal.text == 'us':
+                valtype = SignedType(16, False)
+            elif ctx.literal.text == 's':
+                valtype = SignedType(16, True)
+            elif ctx.literal.text == 'ub':
+                valtype = SignedType(8, False)
+            elif ctx.literal.text == 'b':
+                valtype = SignedType(8, True)
+            else:
+                raise CodegenException(ctx.start, "unkdown interger literal")
+        return ir.Constant(valtype, int(ctx.getText()))
 
     def visitFloat(self, ctx: CalcParser.FloatContext):
-        return ir.Constant(ir.FloatType(), float(ctx.getText()))
+        valtype = ir.DoubleType()
+        if not ctx.literal is None:
+            if ctx.literal.text == 'h':
+                valtype = ir.HalfType()
+            elif ctx.literal.text == 'f':
+                valtype = ir.FloatType()
+            elif ctx.literal.text == 'd':
+                valtype = ir.DoubleType()
+            else:
+                raise CodegenException(ctx.start, "unkdown float literal")
+        return ir.Constant(valtype, float(ctx.getText()))
 
     def visitAddress(self, ctx: CalcParser.AddressContext):
         name = ctx.name.text
