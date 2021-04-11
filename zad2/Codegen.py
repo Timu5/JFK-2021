@@ -436,13 +436,27 @@ class Codegen(CalcVisitor):
         name = ctx.getText()
 
         if name == "int":
-            return ir.IntType(32)
+            return SignedType(32, True)
+        elif name == "uint":
+            return SignedType(32, False)
         elif name == "byte":
-            return ir.IntType(8)
+            return SignedType(8, True)
+        elif name == "ubyte":
+            return SignedType(8, False)
         elif name == "short":
-            return ir.IntType(16)
+            return SignedType(16, True)
+        elif name == "ushort":
+            return SignedType(16, False)
+        elif name == "long":
+            return SignedType(64, True)
+        elif name == "ulong":
+            return SignedType(64, False)
+        elif name == "half":
+            return ir.HalfType()
         elif name == "float":
             return ir.FloatType()
+        elif name == "double":
+            return ir.DoubleType()
         elif name == "void":
             return ir.VoidType()
         elif name in self.structs:
