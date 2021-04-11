@@ -477,6 +477,14 @@ class Codegen(CalcVisitor):
         self.locals = None
         self.builder = None
 
+    def visitExternVar(self, ctx: CalcParser.ExternVarContext):
+        name = ctx.name.text
+        vartype = self.visit(ctx.vartype)
+        global_text = ir.GlobalVariable(self.module, vartype, name=name)
+        global_text.linkage = 'external'
+        global_text.global_constant = False
+        return global_text
+
     def visitExtern(self, ctx: CalcParser.ExternContext):
         retval = self.visit(ctx.rettype)
         name = ctx.name.text

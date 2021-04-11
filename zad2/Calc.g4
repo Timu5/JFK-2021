@@ -77,11 +77,14 @@ fnargsnamed: (vtype IDENT (COMMA vtype IDENT)*)?;
 function
     : 'fn' rettype=vtype name=IDENT LPAREN arguments=fnargsnamed (COMMA varargs='...')? RPAREN block=statement;
 
+externVar
+    : 'extern' vartype=vtype name=IDENT ';';
+
 extern
     : 'extern' rettype=vtype name=IDENT LPAREN arguments=fnargs (COMMA varargs='...')? RPAREN ';';
 
 structMember: membertype=vtype name=IDENT;
-structMembers: structMember (COMMA structMember)? ;
+structMembers: (structMember ';')+ ;
 struct: 'struct' name=IDENT '{' members=structMembers '}';
 
-program: (function | extern | globalVar | struct)* EOF;
+program: (function | extern | externVar | globalVar | struct)* EOF;
