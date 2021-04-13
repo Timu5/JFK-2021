@@ -383,12 +383,12 @@ class Codegen(LangVisitor):
 
         self.builder.position_at_start(w_after_block)
 
-    def visitBlock(self, ctx: LangParser.BlockContext):
+    '''def visitBlock(self, ctx: LangParser.BlockContext):
         statements = []
         for stm in ctx.children:
             if not hasattr(stm, 'symbol'):
                 statements.append(self.visit(stm))
-        return statements
+        return statements'''
 
     def visitDeclaration(self, ctx: LangParser.DeclarationContext):
         if ctx.vartype is None and ctx.value is None:

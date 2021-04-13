@@ -1,14 +1,19 @@
 grammar Lang;
 
+tokens { INDENT, DEDENT }
 
-WS: [ \t\r\n]+ -> skip;
+import Indent;
 
-COMMENT : '/*' .*? '*/' -> skip ;
-COMMENT_LINE : '//' .*? ('\n' | EOF) -> skip ;
+NL: ('\r'? '\n' ' '*);
+
+WS: ' '+ -> skip;
+
+COMMENT : '#=' .*? '=#' -> skip ;
+COMMENT_LINE : '#' .*? ('\n' | EOF) -> skip ;
 
 INT   : [0-9]+;
 FLOAT : ([0-9]* '.' [0-9]+) | ([0-9]+ '.' [0-9]*);
-IDENT : [_a-zA-Z][_0-9a-zA-Z]*;
+ID : [_a-zA-Z][_0-9a-zA-Z]*;
 CHAR  : '\'' . '\'';
 STRING : '"' ~('"')* '"';
 
@@ -20,7 +25,7 @@ LPAREN: '(';
 RPAREN: ')';
 COMMA : ',';
 
-vtype: IDENT                     # basicType
+vtype: ID                     # basicType
     | vtype '*'                  # pointerType
     | vtype '[' (size=INT)? ']'  # arrayType
     ;
@@ -29,20 +34,20 @@ args: (expr (COMMA expr)*)?;
 
 primary
     : op=(PLUS | MINUS) value=primary                       # unary
-    | INT literal=IDENT?                                    # number
-    | FLOAT literal=IDENT?                                  # float
+    | value=INT literal=ID?                              # number
+    | value=FLOAT literal=ID?                            # float
     | CHAR                                                  # char
     | STRING                                                # string
-    | IDENT                                                 # var
+    | ID                                                 # var
     | '[' args ']'                                          # array
-    | name=IDENT '{' args '}'                               # structVal
+    | name=ID '{' args '}'                               # structVal
     | 'cast' '(' vtype ')' primary                          # cast
-    | name=IDENT LPAREN arguments=args RPAREN               # call
+    | name=ID LPAREN arguments=args RPAREN               # call
     | LPAREN expr RPAREN                                    # parenthesis
-    | primary '.' IDENT                                     # member
+    | primary '.' ID                                     # member
     | primary '[' expr ']'                                  # index
-    | '&' name=IDENT                                        # address
-    | '*' name=IDENT                                        # deref
+    | '&' name=ID                                        # address
+    | '*' name=ID                                        # deref
     ;
 
 expr
@@ -55,36 +60,39 @@ expr
     | primary                                               # eprimary
     ;
 
+statements: (statement NL)+;
+
 statement
-    : expr ';'                                              # expression
-    | 'if' LPAREN value=expr RPAREN truee=statement 
-                                 ('else' falsee=statement)? # conditional
-    | 'while' LPAREN value=expr RPAREN block=statement      # loop
-    | 'for' LPAREN a=expr ';' b=expr ';' c=expr RPAREN 
-                                       block=statement      # forLoop
-    | '{' statement* '}'                                    # block
-    | 'let' name=IDENT (':' vartype=vtype)? ('=' value=expr)? ';' # declaration
-    | 'const' name=IDENT '=' value=expr ';'                 # const
-    | 'return' (value=expr)? ';'                            # return
+    : expr                                              # expression
+    | 'if' value=expr ':' INDENT truee=statements DEDENT 
+      ('else' ':' INDENT falsee=statements DEDENT)?      # conditional
+    | 'while' value=expr ':' INDENT block=statements DEDENT  # loop
+    | 'for' a=expr ';' b=expr ';' c=expr ':' INDENT 
+                                       block=statements DEDENT      # forLoop
+    | name=ID (((':' vartype=vtype)? ('=' value=expr)?)|(':=' value=expr)) # declaration
+    | 'const' name=ID (':='|'=') value=expr                 # const
+    | 'return' (value=expr)?                            # return
     ;
 
-globalVar: 'let' name=IDENT ('=' value=expr)? ';';
+globalVar: 'let' name=ID ('=' value=expr)? NL;
 
 fnargs: (vtype (COMMA vtype)*)?;
 
-fnargsnamed: (vtype IDENT (COMMA vtype IDENT)*)?;
+fnargsnamed: (vtype ID (COMMA vtype ID)*)?;
 
 function
-    : 'fn' rettype=vtype name=IDENT LPAREN arguments=fnargsnamed (COMMA varargs='...')? RPAREN block=statement;
+    : 'fn' rettype=vtype name=ID LPAREN arguments=fnargsnamed (COMMA varargs='...')? RPAREN ':' INDENT block=statements DEDENT;
 
 externVar
-    : 'extern' vartype=vtype name=IDENT ';';
+    : 'extern' vartype=vtype name=ID NL;
 
 extern
-    : 'extern' rettype=vtype name=IDENT LPAREN arguments=fnargs (COMMA varargs='...')? RPAREN ';';
+    : 'extern' rettype=vtype name=ID LPAREN arguments=fnargs (COMMA varargs='...')? RPAREN NL;
 
-structMember: membertype=vtype name=IDENT;
-structMembers: (structMember ';')+ ;
-struct: 'struct' name=IDENT '{' members=structMembers '}';
+structMember: membertype=vtype name=ID;
+structMembers: (structMember NL)+ ;
+struct: 'struct' name=ID ':' INDENT members=structMembers DEDENT;
 
 program: (function | extern | externVar | globalVar | struct)* EOF;
+
+
