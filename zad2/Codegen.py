@@ -1,8 +1,8 @@
 from llvmlite import ir
 from antlr4 import *
-from generated.CalcLexer import CalcLexer
-from generated.CalcVisitor import CalcVisitor
-from generated.CalcParser import CalcParser
+from generated.LangLexer import LangLexer
+from generated.LangVisitor import LangVisitor
+from generated.LangParser import LangParser
 import re
 
 
@@ -21,7 +21,7 @@ class SignedType(ir.IntType):
         self.is_signed = signed
         self.is_unsigned = not signed
 
-class Codegen(CalcVisitor):
+class Codegen(LangVisitor):
 
     def __init__(self):
         self.builder = None
@@ -39,7 +39,7 @@ class Codegen(CalcVisitor):
         self.visit(node)
         return self.module
 
-    def visitNumber(self, ctx: CalcParser.NumberContext):
+    def visitNumber(self, ctx: LangParser.NumberContext):
         valtype = SignedType(32, True)
         if not ctx.literal is None:
             if ctx.literal.text == 'u':
@@ -62,7 +62,7 @@ class Codegen(CalcVisitor):
                 raise CodegenException(ctx.start, "unkdown interger literal")
         return ir.Constant(valtype, int(ctx.getText()))
 
-    def visitFloat(self, ctx: CalcParser.FloatContext):
+    def visitFloat(self, ctx: LangParser.FloatContext):
         valtype = ir.DoubleType()
         if not ctx.literal is None:
             if ctx.literal.text == 'h':
@@ -75,19 +75,19 @@ class Codegen(CalcVisitor):
                 raise CodegenException(ctx.start, "unkdown float literal")
         return ir.Constant(valtype, float(ctx.getText()))
 
-    def visitAddress(self, ctx: CalcParser.AddressContext):
+    def visitAddress(self, ctx: LangParser.AddressContext):
         name = ctx.name.text
         return self.getVar(name, ctx)
 
-    def visitDeref(self, ctx: CalcParser.DerefContext):
+    def visitDeref(self, ctx: LangParser.DerefContext):
         name = ctx.name.text
         return self.builder.load(self.builder.load(self.getVar(name, ctx)))
 
-    def visitString(self, ctx: CalcParser.StringContext):
+    def visitString(self, ctx: LangParser.StringContext):
         text = ctx.getText()[
             1:-1].encode('utf-8').decode('unicode_escape') + "\x00"
-        text_const = ir.Constant(ir.ArrayType(ir.IntType(
-            8), len(text)), bytearray(text.encode("utf8")))
+        text_const = ir.Constant(ir.ArrayType(SignedType(
+            8, False), len(text)), bytearray(text.encode("utf8")))
         if self.builder is None:
             return text_const
         global_text = ir.GlobalVariable(
@@ -97,7 +97,7 @@ class Codegen(CalcVisitor):
         global_text.initializer = text_const
         return global_text
 
-    def visitArray(self, ctx: CalcParser.ArrayContext):
+    def visitArray(self, ctx: LangParser.ArrayContext):
         args = self.visit(ctx.children[1])
         if len(args) == 0:
             raise CodegenException(ctx.start, "cannot create empty array")
@@ -117,7 +117,7 @@ class Codegen(CalcVisitor):
         self.builder.store(array, ptr)
         return ptr
 
-    def visitIndex(self, ctx: CalcParser.IndexContext):
+    def visitIndex(self, ctx: LangParser.IndexContext):
         primary = self.visit(ctx.children[0])
         expr = self.visit(ctx.children[2])
 
@@ -128,7 +128,7 @@ class Codegen(CalcVisitor):
         ptr = self.builder.gep(primary, [ir.Constant(ir.IntType(32), 0), expr])
         return self.builder.load(ptr)
 
-    def visitMember(self, ctx: CalcParser.MemberContext):
+    def visitMember(self, ctx: LangParser.MemberContext):
         primary = self.visit(ctx.children[0])  # maybe dont pull whole object?
         name = ctx.children[2].getText()
         struct_name = primary.type.name
@@ -156,7 +156,7 @@ class Codegen(CalcVisitor):
 
         raise CodegenException(ctx.start, "unknown variable")
 
-    def visitVar(self, ctx: CalcParser.VarContext):
+    def visitVar(self, ctx: LangParser.VarContext):
         name = ctx.getText()
         var = self.getVar(name, ctx)
 
@@ -166,10 +166,10 @@ class Codegen(CalcVisitor):
 
         return self.builder.load(var)
 
-    def visitParenthesis(self, ctx: CalcParser.ParenthesisContext):
+    def visitParenthesis(self, ctx: LangParser.ParenthesisContext):
         return self.visit(ctx.children[1])
 
-    def visitStructVal(self, ctx: CalcParser.StructValContext):
+    def visitStructVal(self, ctx: LangParser.StructValContext):
         name = ctx.name.text
 
         if not name in self.structs:
@@ -200,7 +200,7 @@ class Codegen(CalcVisitor):
             raise CodegenException(ctx.start, "wrong type to promote!")
         return left, right
 
-    def visitBinary(self, ctx: CalcParser.BinaryContext):
+    def visitBinary(self, ctx: LangParser.BinaryContext):
         op = ctx.op.type
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
@@ -209,28 +209,33 @@ class Codegen(CalcVisitor):
             left, right = self.promote(left, right, ctx)
 
         if isinstance(left.type, ir.IntType):
-            if op == CalcLexer.PLUS:
+            if op == LangLexer.PLUS:
                 return self.builder.add(left, right)
-            elif op == CalcLexer.MINUS:
+            elif op == LangLexer.MINUS:
                 return self.builder.sub(left, right)
-            elif op == CalcLexer.MULT:
+            elif op == LangLexer.MULT:
                 return self.builder.mul(left, right)
-            elif op == CalcLexer.DIV:
-                return self.builder.sdiv(left, right)
+            elif op == LangLexer.DIV:
+                if left.type.is_signed and right.type.is_signed:
+                    return self.builder.sdiv(left, right)
+                elif left.type.is_unsigned and right.type.is_unsigned:
+                    return self.builder.udiv(left, right)
+                else:
+                    raise CodegenException(ctx.op.start, "mix between signed and unsigned values")
 
         elif isinstance(left.type, ir.FloatType):
-            if op == CalcLexer.PLUS:
+            if op == LangLexer.PLUS:
                 return self.builder.fadd(left, right)
-            elif op == CalcLexer.MINUS:
+            elif op == LangLexer.MINUS:
                 return self.builder.fsub(left, right)
-            elif op == CalcLexer.MULT:
+            elif op == LangLexer.MULT:
                 return self.builder.fmul(left, right)
-            elif op == CalcLexer.DIV:
+            elif op == LangLexer.DIV:
                 return self.builder.fdiv(left, right)
 
         raise CodegenException(ctx.start, "unsuported types in binary")
 
-    def visitCondBinary(self, ctx: CalcParser.CondBinaryContext):
+    def visitCondBinary(self, ctx: LangParser.CondBinaryContext):
         op = ctx.op.text
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
@@ -239,13 +244,19 @@ class Codegen(CalcVisitor):
             left, right = self.promote(left, right, ctx)
 
         if isinstance(left.type, ir.IntType):
-            return self.builder.icmp_signed(op, left, right)
+            if left.type.is_signed and right.type.is_signed:
+                return self.builder.icmp_signed(op, left, right)
+            elif left.type.is_unsigned and right.type.is_unsigned:
+                return self.builder.icmp_unsigned(op, left, right)
+            else:
+                raise CodegenException(ctx.op.start, "mix between signed and unsigned values")
+            
         elif isinstance(left.type, ir.FloatType):
             return self.builder.fcmp_ordered(op, left, right)
 
         raise CodegenException(ctx.start, "unusported type in compare")
 
-    def visitArgs(self, ctx: CalcParser.ArgsContext):
+    def visitArgs(self, ctx: LangParser.ArgsContext):
         if ctx.children is None:
             return []
         args = []
@@ -254,7 +265,7 @@ class Codegen(CalcVisitor):
                 args.append(self.visit(arg))
         return args
 
-    def visitCall(self, ctx: CalcParser.BinaryContext):
+    def visitCall(self, ctx: LangParser.BinaryContext):
         name = ctx.name.text
         args = self.visit(ctx.arguments)
 
@@ -270,7 +281,7 @@ class Codegen(CalcVisitor):
             arg_llvm = arg  # .accept(self)
             if isinstance(arg_llvm.type, ir.PointerType):
                 arg_llvm = self.builder.bitcast(
-                    arg_llvm, ir.IntType(8).as_pointer())
+                    arg_llvm, SignedType(8, False).as_pointer())
             elif fn.ftype.var_arg and isinstance(arg_llvm.type, ir.FloatType):
                 arg_llvm = self.builder.fpext(arg_llvm, ir.DoubleType())
 
@@ -278,7 +289,7 @@ class Codegen(CalcVisitor):
 
         return self.builder.call(fn, irargs)
 
-    def visitTenary(self, ctx: CalcParser.TenaryContext):
+    def visitTenary(self, ctx: LangParser.TenaryContext):
         # cond, truee, falsee
         cond = self.visit(ctx.cond)
         lhs = self.visit(ctx.truee)
@@ -291,7 +302,7 @@ class Codegen(CalcVisitor):
 
         return self.builder.select(cond, lhs, rhs)
 
-    def visitAssign(self, ctx: CalcParser.AssignContext):
+    def visitAssign(self, ctx: LangParser.AssignContext):
         right = self.visit(ctx.right)
 
         left = self.visit(ctx.left)
@@ -319,7 +330,7 @@ class Codegen(CalcVisitor):
         else:
             raise CodegenException(ctx.start, "unknown type for bool value!")
 
-    def visitConditional(self, ctx: CalcParser.ConditionalContext):
+    def visitConditional(self, ctx: LangParser.ConditionalContext):
         cond = self.visit(ctx.value)
         cond = self.convert_to_i1(cond, ctx)
 
@@ -333,7 +344,7 @@ class Codegen(CalcVisitor):
                 with otherwise:
                     self.visit(ctx.falsee)
 
-    def visitLoop(self, ctx: CalcParser.LoopContext):
+    def visitLoop(self, ctx: LangParser.LoopContext):
         cond = self.visit(ctx.value)
         cond = self.convert_to_i1(cond, ctx)
 
@@ -351,7 +362,7 @@ class Codegen(CalcVisitor):
 
         self.builder.position_at_start(w_after_block)
 
-    def visitForLoop(self, ctx: CalcParser.ForLoopContext):
+    def visitForLoop(self, ctx: LangParser.ForLoopContext):
         cond = self.visit(ctx.b)
         cond = self.convert_to_i1(cond, ctx)
 
@@ -372,14 +383,14 @@ class Codegen(CalcVisitor):
 
         self.builder.position_at_start(w_after_block)
 
-    def visitBlock(self, ctx: CalcParser.BlockContext):
+    def visitBlock(self, ctx: LangParser.BlockContext):
         statements = []
         for stm in ctx.children:
             if not hasattr(stm, 'symbol'):
                 statements.append(self.visit(stm))
         return statements
 
-    def visitDeclaration(self, ctx: CalcParser.DeclarationContext):
+    def visitDeclaration(self, ctx: LangParser.DeclarationContext):
         if ctx.vartype is None and ctx.value is None:
             raise CodegenException(ctx.start, "variable need a type!")
 
@@ -401,10 +412,10 @@ class Codegen(CalcVisitor):
         else:
             raise CodegenException(ctx.start, "sorry not ready yet :/")
 
-    def visitExpression(self, ctx: CalcParser.ExpressionContext):
+    def visitExpression(self, ctx: LangParser.ExpressionContext):
         return self.visit(ctx.children[0])
 
-    def visitReturn(self, ctx: CalcParser.ReturnContext):
+    def visitReturn(self, ctx: LangParser.ReturnContext):
         rtype = self.builder.function.ftype.return_type
         if ctx.value is None:
             if not isinstance(rtype, ir.VoidType):
@@ -417,7 +428,7 @@ class Codegen(CalcVisitor):
                     ctx.start, "return need to have same type as function!")
             self.builder.ret(value)
 
-    def visitGlobalVar(self, ctx: CalcParser.GlobalVarContext):
+    def visitGlobalVar(self, ctx: LangParser.GlobalVarContext):
         value = self.visit(ctx.value)
 
         # TODO: add possibility to take global_variable
@@ -432,7 +443,7 @@ class Codegen(CalcVisitor):
 
         return global_var
 
-    def visitBasicType(self, ctx: CalcParser.BasicTypeContext):
+    def visitBasicType(self, ctx: LangParser.BasicTypeContext):
         name = ctx.getText()
 
         if name == "int":
@@ -464,11 +475,11 @@ class Codegen(CalcVisitor):
 
         raise CodegenException(ctx.start, "unknown type")
 
-    def visitPointerType(self, ctx: CalcParser.PointerTypeContext):
+    def visitPointerType(self, ctx: LangParser.PointerTypeContext):
         typ = self.visit(ctx.children[0])
         return typ.as_pointer()
 
-    def visitArrayType(self, ctx: CalcParser.ArrayTypeContext):
+    def visitArrayType(self, ctx: LangParser.ArrayTypeContext):
         typ = self.visit(ctx.children[0])
         if ctx.size == None:
             # TODO: Save somewhere info that this is array
@@ -476,7 +487,7 @@ class Codegen(CalcVisitor):
         elements = int(ctx.size.text)
         return ir.ArrayType(typ, elements)
 
-    def visitFnargs(self, ctx: CalcParser.FnargsContext):
+    def visitFnargs(self, ctx: LangParser.FnargsContext):
         if ctx.children is None:
             return []
         args = []
@@ -485,7 +496,7 @@ class Codegen(CalcVisitor):
                 args.append(self.visit(arg))
         return args
 
-    def visitFnargsnamed(self, ctx: CalcParser.FnargsnamedContext):
+    def visitFnargsnamed(self, ctx: LangParser.FnargsnamedContext):
         if ctx.children is None:
             return [], []
         args = []
@@ -497,7 +508,7 @@ class Codegen(CalcVisitor):
                 args_names.append(arg.getText())
         return args, args_names
 
-    def visitFunction(self, ctx: CalcParser.FunctionContext):
+    def visitFunction(self, ctx: LangParser.FunctionContext):
         retval = self.visit(ctx.rettype)
         name = ctx.name.text
         args, args_names = self.visit(ctx.arguments)
@@ -528,7 +539,7 @@ class Codegen(CalcVisitor):
         self.locals = None
         self.builder = None
 
-    def visitExternVar(self, ctx: CalcParser.ExternVarContext):
+    def visitExternVar(self, ctx: LangParser.ExternVarContext):
         name = ctx.name.text
         vartype = self.visit(ctx.vartype)
         global_text = ir.GlobalVariable(self.module, vartype, name=name)
@@ -536,7 +547,7 @@ class Codegen(CalcVisitor):
         global_text.global_constant = False
         return global_text
 
-    def visitExtern(self, ctx: CalcParser.ExternContext):
+    def visitExtern(self, ctx: LangParser.ExternContext):
         retval = self.visit(ctx.rettype)
         name = ctx.name.text
         args = self.visit(ctx.arguments)
@@ -544,12 +555,12 @@ class Codegen(CalcVisitor):
         fn_ty = ir.FunctionType(retval, args, var_arg=varargs)
         ir.Function(self.module, fn_ty, name=name)
 
-    def visitStructMember(self, ctx: CalcParser.StructMemberContext):
+    def visitStructMember(self, ctx: LangParser.StructMemberContext):
         vtype = self.visit(ctx.membertype)
         name = ctx.name.text
         return name, vtype
 
-    def visitStructMembers(self, ctx: CalcParser.StructMembersContext):
+    def visitStructMembers(self, ctx: LangParser.StructMembersContext):
         if ctx.children is None:
             return []
         members = []
@@ -558,7 +569,7 @@ class Codegen(CalcVisitor):
                 members.append(self.visit(member))
         return members
 
-    def visitStruct(self, ctx: CalcParser.StructContext):
+    def visitStruct(self, ctx: LangParser.StructContext):
         name = ctx.name.text
         members = self.visit(ctx.members)
 

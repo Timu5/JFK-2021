@@ -1,4 +1,4 @@
-grammar Calc;
+grammar Lang;
 
 
 WS: [ \t\r\n]+ -> skip;

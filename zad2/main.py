@@ -1,7 +1,7 @@
 from antlr4 import *
 from ctypes import CFUNCTYPE, c_double, c_int, c_byte, POINTER
-from generated.CalcLexer import CalcLexer
-from generated.CalcParser import CalcParser
+from generated.LangLexer import LangLexer
+from generated.LangParser import LangParser
 from antlr4.error.ErrorListener import ErrorListener
 
 from Codegen import *
@@ -46,9 +46,9 @@ def printerror(line, column, msg):
 
 
 def magic(txt):
-    lexer = CalcLexer(InputStream(txt))
+    lexer = LangLexer(InputStream(txt))
     stream = CommonTokenStream(lexer)
-    parser = CalcParser(stream)
+    parser = LangParser(stream)
 
     parser.removeErrorListeners()
     parser.addErrorListener(MyErrorListener())
