@@ -8,6 +8,8 @@ from Codegen import *
 import llvmlite.binding as llvm
 from antlr4.tree.Trees import Trees
 
+import argparse
+
 
 def exec(module):
     llvm.initialize()
@@ -21,6 +23,7 @@ def exec(module):
     engine = llvm.create_mcjit_compiler(backing_mod, target_machine)
 
     mod = llvm.parse_assembly(str(module))
+    mod.verify()
     engine.add_module(mod)
     engine.finalize_object()
     engine.run_static_constructors()
@@ -29,6 +32,26 @@ def exec(module):
 
     cFunc = CFUNCTYPE(c_int, c_int, POINTER(c_byte))(func_ptr)
     cFunc(0, None)
+
+def compile(module, basename):
+    llvm.initialize()
+    llvm.initialize_native_asmprinter()
+    llvm.initialize_native_target()
+
+    target = llvm.Target.from_default_triple()
+    target_machine = target.create_target_machine()
+
+    mod = llvm.parse_assembly(str(module))
+    mod.verify()
+    with open(f"{basename}.o" % basename, "wb") as o:
+        o.write(target_machine.emit_object(mod))
+
+def invoke_linker(basename):
+    # easy solution call clang with object file
+    # harder solution use ld or lld
+    # import subprocess
+    # subprocess.call(["ls", "-l"])
+    pass
 
 
 class MyErrorListener(ErrorListener):
@@ -45,7 +68,23 @@ def printerror(line, column, msg):
     print("file:" + str(line) + ":" + str(column) + ": " + "error: " + msg)
 
 
-def magic(txt):
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='My super lang compiler')
+    parser.add_argument('--ast', action="store_true", dest="ast", default=False)
+    parser.add_argument('--ir', action="store_true", dest="ir", default=False)
+    parser.add_argument('--run', action="store_true", dest="run", default=False)
+    parser.add_argument('-o', action="store", dest="ouput", default="a.out")
+    parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
+
+    args = parser.parse_args()
+
+    if len(args.file) > 1:
+        print("Multiple files not supported yet :(")
+        quit()
+
+    f =  args.file[0] #open(args.file[0], "r")
+    txt = f.read()
+
     lexer = LangLexer(InputStream(txt))
     stream = CommonTokenStream(lexer)
     parser = LangParser(stream)
@@ -56,26 +95,28 @@ def magic(txt):
     try:
         tree = parser.program()
     except Exception:
-        return
+        quit()
 
-    print(Trees.toStringTree(tree, None, parser))
-
-    print()
+    if args.ast:
+        print(Trees.toStringTree(tree, None, parser))
+        print()
+        quit()
 
     codegen = Codegen()
 
     try:
         ir = codegen.gen_ir(tree)
-        print(str(ir))
-        exec(ir)
     except CodegenException as ex:
         printerror(ex.line, ex.column, ex.msg)
+        quit()
 
+    if args.ir:
+        print(str(ir))
+        quit()
 
-f = open("test.pclang", "r")
-txt = f.read()
-magic(txt)
-'''
-while(True):
-    print(">>>", end="")
-    magic(input())'''
+    if args.run:
+        exec(ir)
+    else:
+        # compile to file
+        print("Compile not ready yet :(")
+        pass
