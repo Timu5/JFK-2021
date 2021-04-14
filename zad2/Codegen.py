@@ -60,7 +60,7 @@ class Codegen(LangVisitor):
                 valtype = SignedType(8, True)
             else:
                 raise CodegenException(ctx.start, "unkdown interger literal")
-        return ir.Constant(valtype, int(ctx.getText()))
+        return ir.Constant(valtype, int(ctx.value.text))
 
     def visitFloat(self, ctx: LangParser.FloatContext):
         valtype = ir.DoubleType()
@@ -73,7 +73,7 @@ class Codegen(LangVisitor):
                 valtype = ir.DoubleType()
             else:
                 raise CodegenException(ctx.start, "unkdown float literal")
-        return ir.Constant(valtype, float(ctx.getText()))
+        return ir.Constant(valtype, float(ctx.value.text))
 
     def visitAddress(self, ctx: LangParser.AddressContext):
         name = ctx.name.text
@@ -125,7 +125,7 @@ class Codegen(LangVisitor):
             raise CodegenException(
                 ctx.start, "array index need to be int type!")
 
-        ptr = self.builder.gep(primary, [ir.Constant(ir.IntType(32), 0), expr])
+        ptr = self.builder.gep(primary, [ir.Constant(SignedType(32, True), 0), expr])
         return self.builder.load(ptr)
 
     def visitMember(self, ctx: LangParser.MemberContext):
@@ -142,7 +142,7 @@ class Codegen(LangVisitor):
             self.builder.block.instructions.pop()
 
         ptr = self.builder.gep(primary, [ir.Constant(
-            ir.IntType(32), 0), ir.Constant(ir.IntType(32), idx)])
+            SignedType(32, True), 0), ir.Constant(SignedType(32, True), idx)])
         return self.builder.load(ptr)
 
     def getVar(self, name, ctx):
@@ -335,9 +335,9 @@ class Codegen(LangVisitor):
         if value.type == ir.IntType(1):
             return value
         if isinstance(value.type, ir.IntType):
-            return self.builder.icmp_signed("!=", value, ir.Constant(ir.IntType(32), 0))
-        elif isinstance(value.type, ir.FloatType):
-            return self.builder.fcmp_ordered("!=", value, ir.Constant(ir.FloatType(), 0.0))
+            return self.builder.icmp_signed("!=", value, ir.Constant(value.type, 0))
+        elif isinstance(value.type, ir.FloatType) or isinstance(value.type, ir.HalfType) or isinstance(value.type, ir.DoubleType):
+            return self.builder.fcmp_ordered("!=", value, ir.Constant(value.type, 0.0))
         # elif isinstance(cond.type, ir.PointerType):
         #    pass
         # TODO: check how to compare to NULL
@@ -405,6 +405,9 @@ class Codegen(LangVisitor):
         return statements'''
 
     def visitDeclaration(self, ctx: LangParser.DeclarationContext):
+        if ctx.name.text in self.locals:
+            raise CodegenException(ctx.start, "variable redefinition!")
+        
         if ctx.vartype is None and ctx.value is None:
             raise CodegenException(ctx.start, "variable need a type!")
 
