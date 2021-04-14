@@ -519,10 +519,10 @@ class Codegen(LangVisitor):
         args = []
         args_names = []
         for i, arg in enumerate(ctx.children):
-            if i % 3 == 0:
-                args.append(self.visit(arg))
-            if i % 3 == 1:
+            if i % 4 == 0:
                 args_names.append(arg.getText())
+            if i % 4 == 2:
+                args.append(self.visit(arg))
         return args, args_names
 
     def visitFunction(self, ctx: LangParser.FunctionContext):
