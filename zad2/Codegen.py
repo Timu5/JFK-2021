@@ -190,6 +190,20 @@ class Codegen(LangVisitor):
         struct = ir.Constant(vtype, [x.constant for x in args])
         return struct
 
+    def visitAndOr(self, ctx:LangParser.AndOrContext):
+        op = ctx.op.text
+        left = self.visit(ctx.left)
+        right = self.visit(ctx.right)
+        left = self.convert_to_i1(left, ctx.left)
+        right = self.convert_to_i1(right, ctx.right)
+
+        if op == 'or':
+            return self.builder.or_(left, right)
+        elif op == 'and':
+            return self.builder.and_(left, right)
+
+        raise CodegenException(ctx.start, "unknown operator") 
+
     def promote(self, left, right, ctx):
         # TODO: Add difrent types and make this more generic
         if isinstance(left.type, ir.IntType) and isinstance(right.type, ir.FloatType):

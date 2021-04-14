@@ -50,15 +50,8 @@ primary
     | '*' name=ID                                        # deref
     ;
 
-expr
-    : left=expr op=(MULT | DIV) right=expr                  # binary
-    | left=expr op=(PLUS | MINUS) right=expr                # binary
-    | left=expr op=('>' | '<' | '>=' | '<=') right=expr     # condBinary
-    | left=expr op=('==' | '!=') right=expr                 # condBinary
-    |<assoc=right> cond=expr '?' truee=expr ':' falsee=expr # tenary
-    |<assoc=right> left=expr op='=' right=expr              # assign
-    | primary                                               # eprimary
-    ;
+	| left = expr op = ('and' | 'or') right = expr						# andOr
+	| <assoc = right> cond = expr '?' truee = expr ':' falsee = expr	# tenary
 
 statements: (statement NL)+;
 
