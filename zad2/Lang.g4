@@ -76,7 +76,8 @@ statement:
 		| (':=' value = expr)
 	) NL												# declaration
 	| 'const' name = ID (':=' | '=') value = expr NL	# const
-	| 'return' (value = expr)? NL						# return;
+	| 'return' (value = expr)? NL						# return
+	| 'pass' NL											# pass;
 
 globalVar:
 	name = ID (
