@@ -117,6 +117,32 @@ class Codegen(LangVisitor):
         self.builder.store(array, ptr)
         return ptr
 
+    def visitCast(self, ctx: LangParser.CastContext):
+        vartype = self.visit(ctx.vartype)
+        value = self.visit(ctx.value)
+
+        if vartype == value.type:
+            print("warning: casting to some type")
+
+        if isinstance(value.type, ir.IntType) and isinstance(vartype, ir.types._BaseFloatType):
+            # TODO: singed vs unsigned
+            value = self.builder.uitofp(value, vartype)
+        elif isinstance(vartype, ir.IntType) and isinstance(value.type, ir.types._BaseFloatType):
+            # TODO: singed vs unsigned
+            value = self.builder.fptoui(value, vartype)
+        elif isinstance(value.type, ir.IntType) and isinstance(vartype, ir.IntType):
+            if value.type.width > vartype.width:
+                value = self.builder.trunc(value, vartype)
+            elif value.type.width < vartype.width:
+                # TODO: singed vs unsigned
+                value = self.builder.sext(value, vartype)
+        elif isinstance(value.type, ir.PointerType) and isinstance(vartype, ir.PointerType):
+            value = self.builder.bitcast(value, vartype)
+        else:
+            raise CodegenException(ctx.start, "wrong type to cast!")
+
+        return value
+
     def visitIndex(self, ctx: LangParser.IndexContext):
         primary = self.visit(ctx.children[0])
         expr = self.visit(ctx.children[2])
