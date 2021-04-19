@@ -117,6 +117,10 @@ class Codegen(LangVisitor):
         self.builder.store(array, ptr)
         return ptr
 
+    def visitChar(self, ctx: LangParser.CharContext):
+        value = ord(ctx.getText()[1:-1])
+        return ir.Constant(SignedType(8, False), value)
+
     def visitCast(self, ctx: LangParser.CastContext):
         vartype = self.visit(ctx.vartype)
         value = self.visit(ctx.value)
