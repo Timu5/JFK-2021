@@ -17,3 +17,8 @@ class SignedType(ir.IntType):
         self.is_signed = signed
         self.is_unsigned = not signed
 
+
+def isNumber(x):
+    if isinstance(x.type, ir.IntType) or isinstance(x.type, ir.types._BaseFloatType):
+        return True
+    return False

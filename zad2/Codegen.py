@@ -154,6 +154,26 @@ class Codegen(LangVisitor):
         ptr = self.builder.gep(primary, [ir.Constant(SignedType(32, True), 0), expr])
         return self.builder.load(ptr)
 
+    def visitUnary(self, ctx:LangParser.UnaryContext):
+        op = ctx.op
+        primary = self.visit(ctx.primary)
+
+        if op == LangLexer.NOT:
+            primary = self.convert_to_i1(ctx, primary)
+            primary = self.builder.not_(primary)
+
+        elif op == LangLexer.PLUS or op == LangLexer.MINUS:
+            if not isNumber(primary):
+                raise CodegenException(ctx.start, "cannot perform unary plus and minus on non numbers")
+            if op == LangLexer.MINUS:
+                if isinstance(primary.type, ir.IntType):
+                    primary = self.builder.neg(primary)
+            else:
+                pass
+        
+        return primary
+
+
     def visitMember(self, ctx: LangParser.MemberContext):
         primary = self.visit(ctx.children[0])  # maybe dont pull whole object?
         name = ctx.children[2].getText()

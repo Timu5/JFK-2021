@@ -14,8 +14,8 @@ WS: ' '+ -> skip;
 COMMENT: '#=' .*? '=#' -> skip;
 COMMENT_LINE: '#' .*? ('\n' | EOF) -> skip;
 
-INT: [0-9]+;
-FLOAT: ([0-9]* '.' [0-9]+) | ([0-9]+ '.' [0-9]*);
+INT: '-'?[0-9]+;
+FLOAT: '-'?([0-9]* '.' [0-9]+) | ([0-9]+ '.' [0-9]*);
 ID: [_a-zA-Z][_0-9a-zA-Z]*;
 CHAR: '\'' . '\'';
 STRING: '"' ~('"')* '"';
@@ -27,6 +27,7 @@ DIV: '/';
 LPAREN: '(';
 RPAREN: ')';
 COMMA: ',';
+NOT: 'not';
 
 vtype:
 	ID								# basicType
@@ -36,7 +37,7 @@ vtype:
 args: (expr (COMMA expr)*)?;
 
 primary:
-	op = (PLUS | MINUS) value = primary					# unary
+	op = (PLUS | MINUS | NOT) value = primary			# unary
 	| value = INT literal = ID?							# number
 	| value = FLOAT literal = ID?						# float
 	| CHAR												# char
