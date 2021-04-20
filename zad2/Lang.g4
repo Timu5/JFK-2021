@@ -49,8 +49,8 @@ primary:
 	| LPAREN expr RPAREN								# parenthesis
 	| primary '.' ID									# member
 	| primary '[' expr ']'								# index
-	| '&' name = ID										# address
-	| '*' name = ID										# deref;
+	| '&' value = primary								# address
+	| '*' value = primary								# deref;
 
 expr:
 	left = expr op = (MULT | DIV) right = expr							# binary

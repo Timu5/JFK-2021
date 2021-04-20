@@ -61,12 +61,23 @@ class Codegen(LangVisitor):
         return ir.Constant(valtype, float(ctx.value.text))
 
     def visitAddress(self, ctx: LangParser.AddressContext):
-        name = ctx.name.text
-        return self.getVar(name, ctx)
+        value = self.visit(ctx.value)
+
+        if isinstance(value, ir.LoadInstr):
+            value = value.operands[0]
+            self.builder.block.instructions.pop()
+        elif isinstance(value, ir.GlobalVariable):
+            pass
+        else:
+            raise CodegenException(ctx.start, "cannot obtain value of this element")
+
+        return value
 
     def visitDeref(self, ctx: LangParser.DerefContext):
-        name = ctx.name.text
-        return self.builder.load(self.builder.load(self.getVar(name, ctx)))
+        value = self.visit(ctx.value)
+        if not isinstance(value.type, ir.PointerType):
+            raise CodegenException(ctx.start, "can only derefernece pointers")
+        return self.builder.load(value)
 
     def visitString(self, ctx: LangParser.StringContext):
         text = ctx.getText()[
