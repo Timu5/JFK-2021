@@ -56,16 +56,14 @@ def invoke_linker(basename):
 
 class MyErrorListener(ErrorListener):
 
-    def __init__(self):
-        super(MyErrorListener, self).__init__()
-
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        printerror(line, column, msg)
+        global f
+        printerror(f.name, line, column, msg)
         raise Exception("syntax")
 
 
-def printerror(line, column, msg):
-    print("file:" + str(line) + ":" + str(column) + ": " + "error: " + msg)
+def printerror(name, line, column, msg):
+    print(name + ":" + str(line) + ":" + str(column) + ": " + "error: " + msg)
 
 
 if __name__ == "__main__":
@@ -107,7 +105,9 @@ if __name__ == "__main__":
     try:
         ir = codegen.gen_ir(tree)
     except CodegenException as ex:
-        printerror(ex.line, ex.column, ex.msg)
+        printerror(f.name, ex.line, ex.column, ex.msg)
+        print(txt.splitlines()[ex.line-1])
+        print(" " * ex.column + "↑")
         quit()
 
     if args.ir:
