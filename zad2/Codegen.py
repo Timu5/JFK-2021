@@ -213,6 +213,17 @@ class Codegen(LangVisitor):
 
         if name == 'sizeof':
             return ir.Constant(SignedType(64, False), primary.type.get_abi_size(self.target_machine.target_data))
+        elif name == 'length' and isinstance(primary.type, SizedArrayType):
+            if not isinstance(primary, ir.LoadInstr):
+                raise CodegenException(
+                    ctx.start, "hle?")
+            primary = primary.operands[0]
+            self.builder.block.instructions.pop()
+
+            ptr = self.builder.gep(
+                primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+
+            return self.builder.load(ptr)
 
         struct_name = primary.type.name
         struct = self.structs[struct_name]
