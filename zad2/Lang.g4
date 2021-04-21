@@ -98,9 +98,9 @@ function:
 externVar: 'extern' name = ID ':' vartype = vtype NL;
 
 extern:
-	'extern' rettype = vtype name = ID LPAREN arguments = fnargs (
+	'extern' name = ID LPAREN arguments = fnargs (
 		COMMA varargs = '...'
-	)? RPAREN NL;
+	)? RPAREN '->' rettype = vtype NL;
 
 structMember: name = ID ':' membertype = vtype;
 structMembers: (structMember NL)+;
