@@ -9,17 +9,13 @@ from Utils import *
 
 class Codegen(LangVisitor):
 
-    def __init__(self):
+    def __init__(self, target_machine):
+        self.target_machine = target_machine
         self.builder = None
         self.module = None
         self.counter = 0
         self.locals = {}
         self.structs = {}
-
-        # https://github.com/RadeonOpenCompute/llvm/blob/b20b796f65ab6ac12fac4ea32e1d89e1861dee6a/lib/Target/AMDGPU/AMDGPUTargetMachine.cpp#L270-L275
-        self.target_data = llvm.create_target_data("e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32"
-                                                   "-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128"
-                                                   "-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5")
 
     def get_uniq(self):
         self.counter += 1
@@ -27,6 +23,8 @@ class Codegen(LangVisitor):
 
     def gen_ir(self, node):
         self.module = ir.Module(name="my_super_modul")
+        self.module.triple = self.target_machine.triple
+        self.module.data_layout = str(self.target_machine.target_data)
         self.visit(node)
         return self.module
 
@@ -184,7 +182,7 @@ class Codegen(LangVisitor):
         name = ctx.children[2].getText()
 
         if name == 'sizeof':
-            return ir.Constant(SignedType(64, False), primary.type.get_abi_size(self.target_data))
+            return ir.Constant(SignedType(64, False), primary.type.get_abi_size(self.target_machine.target_data))
 
         struct_name = primary.type.name
         struct = self.structs[struct_name]

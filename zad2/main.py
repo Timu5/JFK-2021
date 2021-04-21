@@ -10,8 +10,12 @@ from antlr4.tree.Trees import Trees
 
 import argparse
 
+target = None
+target_machine = None
 
-def exec(module):
+
+def llvm_init():
+    global target, target_machine
     llvm.initialize()
     llvm.initialize_native_target()
     llvm.initialize_native_asmprinter()
@@ -19,6 +23,9 @@ def exec(module):
     target = llvm.Target.from_default_triple()
     target_machine = target.create_target_machine()
 
+
+def exec(module):
+    global target_machine
     backing_mod = llvm.parse_assembly("")
     engine = llvm.create_mcjit_compiler(backing_mod, target_machine)
 
@@ -33,14 +40,9 @@ def exec(module):
     cFunc = CFUNCTYPE(c_int, c_int, POINTER(c_byte))(func_ptr)
     cFunc(0, None)
 
+
 def compile(module, basename):
-    llvm.initialize()
-    llvm.initialize_native_asmprinter()
-    llvm.initialize_native_target()
-
-    target = llvm.Target.from_default_triple()
-    target_machine = target.create_target_machine()
-
+    global target_machine
     mod = llvm.parse_assembly(str(module))
     mod.verify()
     with open(f"{basename}.o" % basename, "wb") as o:
@@ -90,6 +92,8 @@ if __name__ == "__main__":
     parser.removeErrorListeners()
     parser.addErrorListener(MyErrorListener())
 
+    llvm_init()
+
     try:
         tree = parser.program()
     except Exception:
@@ -100,7 +104,7 @@ if __name__ == "__main__":
         print()
         quit()
 
-    codegen = Codegen()
+    codegen = Codegen(target_machine)
 
     try:
         ir = codegen.gen_ir(tree)
