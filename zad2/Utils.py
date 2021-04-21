@@ -18,6 +18,12 @@ class SignedType(ir.IntType):
         self.is_unsigned = not signed
 
 
+class SizedArrayType(ir.LiteralStructType):
+    def __init__(self, element_type):
+        super().__init__([SignedType(64, False),
+                          ir.ArrayType(element_type, 1).as_pointer()])
+
+
 def isNumber(x):
     if isinstance(x.type, ir.IntType) or isinstance(x.type, ir.types._BaseFloatType):
         return True

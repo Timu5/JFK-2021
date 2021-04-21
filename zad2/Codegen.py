@@ -115,7 +115,20 @@ class Codegen(LangVisitor):
             return array
         ptr = self.builder.alloca(array_type)
         self.builder.store(array, ptr)
-        return ptr
+
+        new_array_type = SizedArrayType(args[0].type)
+        newptr = self.builder.alloca(new_array_type)
+        
+        ptr = self.builder.gep(ptr, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+        ptr = self.builder.bitcast(ptr, ir.ArrayType(args[0].type, 1).as_pointer())
+        
+        ptr_size = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 0)])
+        ptr_ptr = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 1)])
+        
+        self.builder.store(ir.Constant(SignedType(64, False), len(args)), ptr_size)
+        self.builder.store(ptr, ptr_ptr)
+
+        return newptr
 
     def visitChar(self, ctx: LangParser.CharContext):
         value = ord(ctx.getText()[1:-1])
@@ -149,16 +162,33 @@ class Codegen(LangVisitor):
 
     def visitIndex(self, ctx: LangParser.IndexContext):
         primary = self.visit(ctx.children[0])
+
+        if not isinstance(primary.type, SizedArrayType):
+            raise CodegenException(
+                ctx.start, "not proper array")
+        
+        if not isinstance(primary, ir.LoadInstr):
+            raise CodegenException(
+                ctx.start, "hle?")
+        primary = primary.operands[0]
+        self.builder.block.instructions.pop()
+
         expr = self.visit(ctx.children[2])
 
         if not isinstance(expr.type, ir.IntType):
             raise CodegenException(
                 ctx.start, "array index need to be int type!")
 
-        ptr = self.builder.gep(primary, [ir.Constant(SignedType(32, True), 0), expr])
+        ptr = self.builder.gep(
+            primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 1)])
+
+        ptr = self.builder.load(ptr)
+
+        ptr = self.builder.gep(
+            ptr, [ir.Constant(SignedType(32, True), 0), expr])
         return self.builder.load(ptr)
 
-    def visitUnary(self, ctx:LangParser.UnaryContext):
+    def visitUnary(self, ctx: LangParser.UnaryContext):
         op = ctx.op
         primary = self.visit(ctx.primary)
 
