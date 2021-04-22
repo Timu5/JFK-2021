@@ -4,7 +4,8 @@ from generated.LangLexer import LangLexer
 from generated.LangParser import LangParser
 from antlr4.error.ErrorListener import ErrorListener
 
-from Codegen import *
+from Codegen import Codegen
+from Utils import CodegenException
 import llvmlite.binding as llvm
 from antlr4.tree.Trees import Trees
 
@@ -19,9 +20,11 @@ def llvm_init():
     llvm.initialize()
     llvm.initialize_native_target()
     llvm.initialize_native_asmprinter()
+    #llvm.load_library_permanently("gc.dll")
+    #llvm.load_library_permanently("runtime.dll")
 
     llvm.load_library_permanently("./libgc.so")
-    llvm.load_library_permanently("./libruntime.so")
+    llvm.load_library_permanently("./runtime/build/libruntime.so")
 
     target = llvm.Target.from_default_triple()
     target_machine = target.create_target_machine()
@@ -51,6 +54,7 @@ def compile(module, basename):
     with open(f"{basename}.o" % basename, "wb") as o:
         o.write(target_machine.emit_object(mod))
 
+
 def invoke_linker(basename):
     # easy solution call clang with object file
     # harder solution use ld or lld
@@ -71,11 +75,30 @@ def printerror(name, line, column, msg):
     print(name + ":" + str(line) + ":" + str(column) + ": " + "error: " + msg)
 
 
+def parse_text(txt):
+    lexer = LangLexer(InputStream(txt))
+    stream = CommonTokenStream(lexer)
+    parser = LangParser(stream)
+
+    parser.removeErrorListeners()
+    parser.addErrorListener(MyErrorListener())
+
+    try:
+        tree = parser.program()
+    except Exception:
+        print("konczymy")
+        quit()
+
+    return tree
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='My super lang compiler')
-    parser.add_argument('--ast', action="store_true", dest="ast", default=False)
+    parser.add_argument('--ast', action="store_true",
+                        dest="ast", default=False)
     parser.add_argument('--ir', action="store_true", dest="ir", default=False)
-    parser.add_argument('--run', action="store_true", dest="run", default=False)
+    parser.add_argument('--run', action="store_true",
+                        dest="run", default=False)
     parser.add_argument('-o', action="store", dest="ouput", default="a.out")
     parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
 
@@ -85,27 +108,17 @@ if __name__ == "__main__":
         print("Multiple files not supported yet :(")
         quit()
 
-    f =  args.file[0] #open(args.file[0], "r")
+    f = args.file[0]
     txt = f.read()
 
-    lexer = LangLexer(InputStream(txt))
-    stream = CommonTokenStream(lexer)
-    parser = LangParser(stream)
-
-    parser.removeErrorListeners()
-    parser.addErrorListener(MyErrorListener())
-
-    llvm_init()
-
-    try:
-        tree = parser.program()
-    except Exception:
-        quit()
+    tree = parse_text(txt)
 
     if args.ast:
         print(Trees.toStringTree(tree, None, parser))
         print()
         quit()
+
+    llvm_init()
 
     codegen = Codegen(target_machine)
 

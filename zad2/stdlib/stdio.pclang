@@ -1,0 +1,9 @@
+extern printf(byte*, ...) -> int
+extern scanf(byte*, ...) -> int
+extern puts(byte*) -> int
+
+fn println(str: string) -> void:
+    puts(str)
+
+fn print(str: string) -> void:
+    printf(str)

@@ -769,3 +769,17 @@ class Codegen(LangVisitor):
         self.structs[name] = members
         b = self.module.context.get_identified_type(name)
         b.set_body(*[x[1] for x in members])
+
+    def visitImportLib(self, ctx:LangParser.ImportLibContext):
+        name = ctx.name.text
+
+        with open("./stdlib/" + name + ".pclang") as f:
+            from main import parse_text
+            tree = parse_text(f.read())
+            codegen = Codegen(self.target_machine)
+            module = codegen.gen_ir(tree)
+
+            for f in module.functions:
+                if not f.name in self.module.globals:
+                    self.module.add_global(f)
+                    # TODO: finish me!
