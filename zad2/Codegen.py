@@ -247,17 +247,27 @@ class Codegen(LangVisitor):
 
         if name == 'sizeof':
             return ir.Constant(SignedType(64, False), primary.type.get_abi_size(self.target_machine.target_data))
-        elif name == 'length' and isinstance(primary.type, SizedArrayType):
+        elif isinstance(primary.type, SizedArrayType) or isinstance(primary.type, StringType):
             if not isinstance(primary, ir.LoadInstr):
                 raise CodegenException(
                     ctx.start, "hle?")
             primary = primary.operands[0]
             self.builder.block.instructions.pop()
+            if name == 'length':
+                ptr = self.builder.gep(
+                    primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
 
-            ptr = self.builder.gep(
-                primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+                return self.builder.load(ptr)
+            elif name == 'ptr':
+                ptr = self.builder.gep(
+                    primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 1)])
 
-            return self.builder.load(ptr)
+                ptr = self.builder.load(ptr)
+
+                return self.builder.bitcast(ptr, ptr.type.pointee.element.as_pointer())
+ 
+            else:
+                raise CodegenException(ctx.start, 'arrays have only "length" and "ptr" properties')
 
         struct_name = primary.type.name
         struct = self.structs[struct_name]
