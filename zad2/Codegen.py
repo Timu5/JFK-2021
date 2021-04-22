@@ -627,8 +627,7 @@ class Codegen(LangVisitor):
     def visitArrayType(self, ctx: LangParser.ArrayTypeContext):
         typ = self.visit(ctx.children[0])
         if ctx.size == None:
-            # TODO: Save somewhere info that this is array
-            return typ.as_pointer()
+            return SizedArrayType(typ)
         elements = int(ctx.size.text)
         return ir.ArrayType(typ, elements)
 
