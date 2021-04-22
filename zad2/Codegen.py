@@ -140,7 +140,7 @@ class Codegen(LangVisitor):
         self.builder.store(ir.Constant(SignedType(64, False), len(args)), ptr_size)
         self.builder.store(ptr, ptr_ptr)
 
-        return newptr
+        return self.builder.load(newptr)
 
     def visitChar(self, ctx: LangParser.CharContext):
         value = ord(ctx.getText()[1:-1])
