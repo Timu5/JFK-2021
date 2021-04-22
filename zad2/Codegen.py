@@ -5,7 +5,7 @@ from generated.LangLexer import LangLexer
 from generated.LangVisitor import LangVisitor
 from generated.LangParser import LangParser
 from Utils import *
-
+from Runtime import *
 
 class Codegen(LangVisitor):
 
@@ -13,6 +13,7 @@ class Codegen(LangVisitor):
         self.target_machine = target_machine
         self.builder = None
         self.module = None
+        self.runtime = None
         self.counter = 0
         self.locals = {}
         self.structs = {}
@@ -25,6 +26,7 @@ class Codegen(LangVisitor):
         self.module = ir.Module(name="my_super_modul")
         self.module.triple = self.target_machine.triple
         self.module.data_layout = str(self.target_machine.target_data)
+        self.runtime = get_runtime_functions(self.module)
         self.visit(node)
         return self.module
 

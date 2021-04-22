@@ -20,6 +20,9 @@ def llvm_init():
     llvm.initialize_native_target()
     llvm.initialize_native_asmprinter()
 
+    llvm.load_library_permanently("./libgc.so")
+    llvm.load_library_permanently("./libruntime.so")
+
     target = llvm.Target.from_default_triple()
     target_machine = target.create_target_machine()
 
