@@ -549,7 +549,13 @@ class Codegen(LangVisitor):
             self.locals[ctx.name.text] = ptr
 
         else:
-            raise CodegenException(ctx.start, "sorry not ready yet :/")
+            vartype = self.visit(ctx.vartype)
+            value = self.visit(ctx.value)
+            if vartype != value.type:
+                raise CodegenException(ctx.vartype.start, "wrong types")
+            ptr = self.builder.alloca(value.type)
+            self.builder.store(value, ptr)
+            self.locals[ctx.name.text] = ptr
 
     def visitExpression(self, ctx: LangParser.ExpressionContext):
         return self.visit(ctx.children[0])
