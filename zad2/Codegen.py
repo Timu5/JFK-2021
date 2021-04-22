@@ -319,6 +319,11 @@ class Codegen(LangVisitor):
             left = self.builder.uitofp(left, ir.FloatType())
         elif isinstance(right.type, ir.IntType) and isinstance(left.type, ir.FloatType):
             right = self.builder.uitofp(right, ir.FloatType())
+        elif isinstance(left.type, ir.IntType) and isinstance(right.type, ir.IntType):
+            if left.type.width > right.type.width:
+                right = self.builder.sext(right, left.type) # TODO: singed vs unsigned
+            if left.type.width < right.type.width:
+                left = self.builder.sext(left, right.type) # TODO: singed vs unsigned
         else:
             raise CodegenException(ctx.start, "wrong type to promote!")
         return left, right
