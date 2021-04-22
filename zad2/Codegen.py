@@ -361,6 +361,14 @@ class Codegen(LangVisitor):
             elif op == LangLexer.DIV:
                 return self.builder.fdiv(left, right)
 
+        elif isinstance(left.type, SizedArrayType):
+            if op != LangLexer.PLUS:
+                raise CodegenException(ctx.op.start, "can only add arrays")
+            a = left.type.elements[1].pointee.element
+            el_size = ir.Constant(SignedType(64, False), a.get_abi_size(self.target_machine.target_data))
+            return self.builder.call(self.runtime['array_add'], [left, right, el_size, self.runtime['GC_malloc']])
+
+
         raise CodegenException(ctx.start, "unsuported types in binary")
 
     def visitCondBinary(self, ctx: LangParser.CondBinaryContext):
