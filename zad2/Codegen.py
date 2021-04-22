@@ -404,7 +404,7 @@ class Codegen(LangVisitor):
         elif isinstance(left.type, StringType):
             if op != LangLexer.PLUS:
                 raise CodegenException(ctx.op.start, "can only add strings")
-            return self.builder.call(self.runtime['string_add'], [left, right, self.runtime['GC_malloc']])
+            return self.builder.call(self.runtime['string_add'], [left, right, self.runtime['GC_malloc_atomic']])
 
 
         raise CodegenException(ctx.start, "unsuported types in binary")
