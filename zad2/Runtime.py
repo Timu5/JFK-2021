@@ -24,4 +24,6 @@ def get_runtime_functions(module):
                                        SizedArrayType(SignedType(32, True)), SizedArrayType(SignedType(32, True)), SignedType(64, False), ir.FunctionType(
                                            voidptr_ty, [SignedType(64, False)]).as_pointer()]), name="array_add")
 
+    runtime["string_add"] = ir.Function(module, ir.FunctionType(StringType(), [StringType(), StringType(), ir.FunctionType(voidptr_ty, [SignedType(64, False)]).as_pointer()]), name="string_add")
+
     return runtime

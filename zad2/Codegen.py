@@ -89,16 +89,36 @@ class Codegen(LangVisitor):
     def visitString(self, ctx: LangParser.StringContext):
         text = ctx.getText()[
             1:-1].encode('utf-8').decode('unicode_escape') + "\x00"
-        text_const = ir.Constant(ir.ArrayType(SignedType(
-            8, False), len(text)), bytearray(text.encode("utf8")))
+        text_type = ir.ArrayType(SignedType(8, False), len(text))
+        text_const = ir.Constant(text_type, bytearray(text.encode("utf8")))
+
         if self.builder is None:
-            return text_const
-        global_text = ir.GlobalVariable(
-            self.module, text_const.type, name=".str."+str(self.get_uniq()))
-        global_text.linkage = 'internal'
-        global_text.global_constant = False
-        global_text.initializer = text_const
-        return global_text
+            global_arr = ir.GlobalVariable(self.module, text_type, name=".str."+str(self.get_uniq()))
+            global_arr.linkage = 'internal'
+            global_arr.global_constant = False
+            global_arr.initializer = text_const
+
+            global_gep = global_arr.gep([ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+            global_bit = global_gep.bitcast(ir.ArrayType(text_type.element, 1).as_pointer())
+
+            return ir.Constant(StringType(), [ir.Constant(SignedType(64, False), len(text)-1), global_bit])
+
+        ptr = self.builder.alloca(text_type)
+        self.builder.store(text_const, ptr)
+
+        new_array_type = StringType()
+        newptr = self.builder.alloca(new_array_type)
+        
+        ptr = self.builder.gep(ptr, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+        ptr = self.builder.bitcast(ptr, ir.ArrayType(text_type.element, 1).as_pointer())
+        
+        ptr_size = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 0)])
+        ptr_ptr = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 1)])
+        
+        self.builder.store(ir.Constant(SignedType(64, False), len(text)-1), ptr_size)
+        self.builder.store(ptr, ptr_ptr)
+
+        return self.builder.load(newptr)
 
     def visitArray(self, ctx: LangParser.ArrayContext):
         args = self.visit(ctx.children[1])
@@ -371,6 +391,11 @@ class Codegen(LangVisitor):
             el_size = ir.Constant(SignedType(64, False), a.get_abi_size(self.target_machine.target_data))
             return self.builder.call(self.runtime['array_add'], [left, right, el_size, self.runtime['GC_malloc']])
 
+        elif isinstance(left.type, StringType):
+            if op != LangLexer.PLUS:
+                raise CodegenException(ctx.op.start, "can only add strings")
+            return self.builder.call(self.runtime['string_add'], [left, right, self.runtime['GC_malloc']])
+
 
         raise CodegenException(ctx.start, "unsuported types in binary")
 
@@ -419,11 +444,14 @@ class Codegen(LangVisitor):
                 raise CodegenException(ctx.start, "wrong args count")
 
         irargs = []
-        for arg in args:
-            arg_llvm = arg  # .accept(self)
-            if isinstance(arg_llvm.type, ir.PointerType):
-                arg_llvm = self.builder.bitcast(
-                    arg_llvm, SignedType(8, False).as_pointer())
+        for i, arg in enumerate(args):
+            arg_llvm = arg
+            if isinstance(arg_llvm.type, StringType):
+                if isinstance(fn.args[i].type, ir.PointerType):
+                    if fn.args[i].type.pointee.width == 8:
+                        arg_llvm = self.builder.gep(arg_llvm.operands[0], [ir.Constant(SignedType(32, False), 0),ir.Constant(SignedType(32, False), 1)])
+                        arg_llvm = self.builder.load(arg_llvm)
+                        arg_llvm = self.builder.bitcast(arg_llvm, fn.args[i].type)
             elif fn.ftype.var_arg and isinstance(arg_llvm.type, ir.FloatType):
                 arg_llvm = self.builder.fpext(arg_llvm, ir.DoubleType())
 
@@ -621,6 +649,8 @@ class Codegen(LangVisitor):
             return ir.DoubleType()
         elif name == "void":
             return ir.VoidType()
+        elif name == "string":
+            return StringType()
         elif name in self.structs:
             return self.module.context.get_identified_type(name)
 
