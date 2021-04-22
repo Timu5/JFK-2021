@@ -50,7 +50,7 @@ class Codegen(LangVisitor):
             elif ctx.literal.text == 'b':
                 valtype = SignedType(8, True)
             else:
-                raise CodegenException(ctx.start, "unkdown interger literal")
+                raise CodegenException(ctx.start, "unknown interger literal")
         return ir.Constant(valtype, int(ctx.value.text))
 
     def visitFloat(self, ctx: LangParser.FloatContext):
@@ -63,7 +63,7 @@ class Codegen(LangVisitor):
             elif ctx.literal.text == 'd':
                 valtype = ir.DoubleType()
             else:
-                raise CodegenException(ctx.start, "unkdown float literal")
+                raise CodegenException(ctx.start, "unknown float literal")
         return ir.Constant(valtype, float(ctx.value.text))
 
     def visitAddress(self, ctx: LangParser.AddressContext):
@@ -75,7 +75,8 @@ class Codegen(LangVisitor):
         elif isinstance(value, ir.GlobalVariable):
             pass
         else:
-            raise CodegenException(ctx.start, "cannot obtain value of this element")
+            raise CodegenException(
+                ctx.start, "cannot obtain value of this element")
 
         return value
 
@@ -105,11 +106,11 @@ class Codegen(LangVisitor):
             raise CodegenException(ctx.start, "cannot create empty array")
         if any([not isinstance(a, ir.Constant) for a in args]):
             raise CodegenException(
-                ctx.start, "array must be built from consts!")
+                ctx.start, "array must be built from consts elements")
         first_type = args[0].type
         if any([not a.type == first_type for a in args]):
             raise CodegenException(
-                ctx.start, "array must be built from same types!")
+                ctx.start, "array must be built from same types")
 
         array_type = ir.ArrayType(first_type, len(args))
         array = ir.Constant(array_type, [x.constant for x in args])
@@ -168,7 +169,7 @@ class Codegen(LangVisitor):
         elif isinstance(value.type, ir.PointerType) and isinstance(vartype, ir.PointerType):
             value = self.builder.bitcast(value, vartype)
         else:
-            raise CodegenException(ctx.start, "wrong type to cast!")
+            raise CodegenException(ctx.start, "wrong type to cast")
 
         return value
 
@@ -189,7 +190,7 @@ class Codegen(LangVisitor):
 
         if not isinstance(expr.type, ir.IntType):
             raise CodegenException(
-                ctx.start, "array index need to be int type!")
+                ctx.start, "array index need to be of int type")
 
         ptr = self.builder.gep(
             primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 1)])
@@ -210,13 +211,14 @@ class Codegen(LangVisitor):
 
         elif op == LangLexer.PLUS or op == LangLexer.MINUS:
             if not isNumber(primary):
-                raise CodegenException(ctx.start, "cannot perform unary plus and minus on non numbers")
+                raise CodegenException(
+                    ctx.start, "cannot perform unary plus and minus on non numbers")
             if op == LangLexer.MINUS:
                 if isinstance(primary.type, ir.IntType):
                     primary = self.builder.neg(primary)
             else:
                 pass
-        
+
         return primary
 
     def visitMember(self, ctx: LangParser.MemberContext):
@@ -244,7 +246,7 @@ class Codegen(LangVisitor):
                        if (lambda x: x[0] == name)(v))
         except Exception:
             raise CodegenException(
-                    ctx.start, f'cannot find member "{name}" of struct "{struct_name}"')
+                ctx.start, f'cannot find member "{name}" of struct "{struct_name}"')
 
         if isinstance(primary, ir.LoadInstr):
             primary = primary.operands[0]
@@ -282,7 +284,7 @@ class Codegen(LangVisitor):
         name = ctx.name.text
 
         if not name in self.structs:
-            raise CodegenException(ctx.start, "no struct with this name!")
+            raise CodegenException(ctx.start, "no struct with this name")
 
         vtype = self.module.context.get_identified_type(name)
 
@@ -291,15 +293,15 @@ class Codegen(LangVisitor):
             raise CodegenException(ctx.start, "cannot create empty struct")
         if any([not isinstance(a, ir.Constant) for a in args]):
             raise CodegenException(
-                ctx.start, "struct must be built from consts!")
+                ctx.start, "struct must be built from consts elements")
 
         if any([not a.type == b for a, b in zip(args, vtype.elements)]):
-            raise CodegenException(ctx.start, "types mismatch!")
+            raise CodegenException(ctx.start, "types mismatch")
 
         struct = ir.Constant(vtype, [x.constant for x in args])
         return struct
 
-    def visitAndOr(self, ctx:LangParser.AndOrContext):
+    def visitAndOr(self, ctx: LangParser.AndOrContext):
         op = ctx.op.text
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
@@ -311,7 +313,7 @@ class Codegen(LangVisitor):
         elif op == 'and':
             return self.builder.and_(left, right)
 
-        raise CodegenException(ctx.start, "unknown operator") 
+        raise CodegenException(ctx.start, "unknown operator")
 
     def promote(self, left, right, ctx):
         # TODO: Add difrent types and make this more generic
@@ -325,7 +327,7 @@ class Codegen(LangVisitor):
             if left.type.width < right.type.width:
                 left = self.builder.sext(left, right.type) # TODO: singed vs unsigned
         else:
-            raise CodegenException(ctx.start, "wrong type to promote!")
+            raise CodegenException(ctx.start, "wrong type to promote")
         return left, right
 
     def visitBinary(self, ctx: LangParser.BinaryContext):
@@ -349,7 +351,8 @@ class Codegen(LangVisitor):
                 elif left.type.is_unsigned and right.type.is_unsigned:
                     return self.builder.udiv(left, right)
                 else:
-                    raise CodegenException(ctx.op.start, "mix between signed and unsigned values")
+                    raise CodegenException(
+                        ctx.op.start, "mix between signed and unsigned values")
 
         elif isinstance(left.type, ir.FloatType):
             if op == LangLexer.PLUS:
@@ -385,8 +388,9 @@ class Codegen(LangVisitor):
             elif left.type.is_unsigned and right.type.is_unsigned:
                 return self.builder.icmp_unsigned(op, left, right)
             else:
-                raise CodegenException(ctx.op.start, "mix between signed and unsigned values")
-            
+                raise CodegenException(
+                    ctx.op.start, "mix between signed and unsigned values")
+
         elif isinstance(left.type, ir.FloatType):
             return self.builder.fcmp_ordered(op, left, right)
 
@@ -407,10 +411,12 @@ class Codegen(LangVisitor):
 
         fn = self.module.get_global(name)
         # TODO: check if function and if fn exist
+        if fn is None:
+            raise CodegenException(ctx.start, "cannot find function")
 
         if len(fn.args) != len(args):
             if not (fn.ftype.var_arg and len(fn.args) < len(args)):
-                raise CodegenException(ctx.start, "Wrong args number!")
+                raise CodegenException(ctx.start, "wrong args count")
 
         irargs = []
         for arg in args:
@@ -464,7 +470,7 @@ class Codegen(LangVisitor):
         #    pass
         # TODO: check how to compare to NULL
         else:
-            raise CodegenException(ctx.start, "unknown type for bool value!")
+            raise CodegenException(ctx.start, "unknown type for bool value")
 
     def visitConditional(self, ctx: LangParser.ConditionalContext):
         cond = self.visit(ctx.value)
@@ -528,10 +534,10 @@ class Codegen(LangVisitor):
 
     def visitDeclaration(self, ctx: LangParser.DeclarationContext):
         if ctx.name.text in self.locals:
-            raise CodegenException(ctx.start, "variable redefinition!")
-        
+            raise CodegenException(ctx.start, "variable redefinition")
+
         if ctx.vartype is None and ctx.value is None:
-            raise CodegenException(ctx.start, "variable need a type!")
+            raise CodegenException(ctx.start, "variable need a type")
 
         elif ctx.vartype is None and not ctx.value is None:
             value = self.visit(ctx.value)
@@ -540,7 +546,7 @@ class Codegen(LangVisitor):
                 return
             ptr = self.builder.alloca(value.type)
             self.builder.store(value, ptr)
-            self.locals[ctx.name.text] = ptr             
+            self.locals[ctx.name.text] = ptr
 
         elif not ctx.vartype is None and ctx.value is None:
             # only allocate space
@@ -564,13 +570,13 @@ class Codegen(LangVisitor):
         rtype = self.builder.function.ftype.return_type
         if ctx.value is None:
             if not isinstance(rtype, ir.VoidType):
-                raise CodegenException(ctx.start, "return need to have value!")
+                raise CodegenException(ctx.start, "return need to have value")
             self.builder.ret_void()
         else:
             value = self.visit(ctx.value)
             if value.type != rtype:
                 raise CodegenException(
-                    ctx.start, "return need to have same type as function!")
+                    ctx.start, "return need to have same type as function")
             self.builder.ret(value)
 
     def visitGlobalVar(self, ctx: LangParser.GlobalVarContext):
@@ -578,7 +584,7 @@ class Codegen(LangVisitor):
 
         # TODO: add possibility to take global_variable
         if not isinstance(value, ir.Constant):
-            raise CodegenException(ctx.start, "global vars need to be const!")
+            raise CodegenException(ctx.start, "global vars need to be const")
 
         # TODO: check global name redefinition!
         global_var = ir.GlobalVariable(
@@ -718,7 +724,7 @@ class Codegen(LangVisitor):
         members = self.visit(ctx.members)
 
         if name in self.structs:
-            raise CodegenException(ctx.start, "struct redefinition!")
+            raise CodegenException(ctx.start, "struct redefinition")
 
         self.structs[name] = members
         b = self.module.context.get_identified_type(name)
