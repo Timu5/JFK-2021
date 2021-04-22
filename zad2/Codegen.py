@@ -114,7 +114,17 @@ class Codegen(LangVisitor):
         array_type = ir.ArrayType(first_type, len(args))
         array = ir.Constant(array_type, [x.constant for x in args])
         if self.builder is None:
-            return array
+            # global array
+            global_arr = ir.GlobalVariable(self.module, array_type, name=".arr."+str(self.get_uniq()))
+            global_arr.linkage = 'internal'
+            global_arr.global_constant = False
+            global_arr.initializer = array
+
+            global_gep = global_arr.gep([ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+            global_bit = global_gep.bitcast(ir.ArrayType(args[0].type, 1).as_pointer())
+
+            return ir.Constant(SizedArrayType(first_type), [ir.Constant(SignedType(64, False), len(args)), global_bit])
+        
         ptr = self.builder.alloca(array_type)
         self.builder.store(array, ptr)
 
