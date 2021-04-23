@@ -23,6 +23,11 @@ class SizedArrayType(ir.LiteralStructType):
         super().__init__([SignedType(64, False),
                           ir.ArrayType(element_type, 1).as_pointer()])
 
+class StringType(ir.LiteralStructType):
+    def __init__(self):
+        super().__init__([SignedType(64, False),
+                          ir.ArrayType(SignedType(8, False), 1).as_pointer()])
+
 
 def isNumber(x):
     if isinstance(x.type, ir.IntType) or isinstance(x.type, ir.types._BaseFloatType):

@@ -107,5 +107,6 @@ structMembers: (structMember NL)+;
 struct:
 	'struct' name = ID ':' INDENT members = structMembers DEDENT;
 
-program: (function | extern | externVar | globalVar | struct)* EOF;
+importLib: 'import' name = ID NL;
+
 

@@ -23,7 +23,7 @@ def llvm_init():
     #llvm.load_library_permanently("gc.dll")
     #llvm.load_library_permanently("runtime.dll")
 
-    llvm.load_library_permanently("./libgc.so")
+    llvm.load_library_permanently("./runtime/build/bdwgc/libgc.so")
     llvm.load_library_permanently("./runtime/build/libruntime.so")
 
     target = llvm.Target.from_default_triple()
