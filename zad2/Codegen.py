@@ -123,18 +123,24 @@ class Codegen(LangVisitor):
 
     def visitArray(self, ctx: LangParser.ArrayContext):
         args = self.visit(ctx.children[1])
+        const = True
         if len(args) == 0:
             raise CodegenException(ctx.start, "cannot create empty array")
         if any([not isinstance(a, ir.Constant) for a in args]):
-            raise CodegenException(
-                ctx.start, "array must be built from consts elements")
+            const = False
+            if self.builder is None:
+                raise CodegenException(
+                    ctx.start, "array must be built from consts elements")
         first_type = args[0].type
         if any([not a.type == first_type for a in args]):
             raise CodegenException(
                 ctx.start, "array must be built from same types")
 
         array_type = ir.ArrayType(first_type, len(args))
-        array = ir.Constant(array_type, [x.constant for x in args])
+
+        array = ir.Constant(array_type, [ir.Constant(first_type, 0) for x in args])
+        if const:
+            array = ir.Constant(array_type, [x.constant for x in args])
         if self.builder is None:
             # global array
             global_arr = ir.GlobalVariable(self.module, array_type, name=".arr."+str(self.get_uniq()))
@@ -148,7 +154,13 @@ class Codegen(LangVisitor):
             return ir.Constant(SizedArrayType(first_type), [ir.Constant(SignedType(64, False), len(args)), global_bit])
         
         ptr = self.builder.alloca(array_type)
-        self.builder.store(array, ptr)
+
+        if not const:
+            for i, x in enumerate(args):
+                el_ptr = self.builder.gep(ptr, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), i)])
+                self.builder.store(x, el_ptr)
+        else:
+            self.builder.store(array, ptr)
 
         new_array_type = SizedArrayType(args[0].type)
         newptr = self.builder.alloca(new_array_type)
