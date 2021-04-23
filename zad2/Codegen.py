@@ -212,7 +212,7 @@ class Codegen(LangVisitor):
     def visitIndex(self, ctx: LangParser.IndexContext):
         primary = self.visit(ctx.children[0])
 
-        if not isinstance(primary.type, SizedArrayType):
+        if not isinstance(primary.type, SizedArrayType) and not isinstance(primary.type, StringType):
             raise CodegenException(
                 ctx.start, "not proper array")
         
