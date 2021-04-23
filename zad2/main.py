@@ -14,6 +14,8 @@ import argparse
 target = None
 target_machine = None
 
+files = []
+
 
 def llvm_init():
     global target, target_machine
@@ -66,13 +68,18 @@ def invoke_linker(basename):
 class MyErrorListener(ErrorListener):
 
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        global f
-        printerror(f.name, line, column, msg)
+        printerror(line, column, msg)
         raise Exception("syntax")
 
 
-def printerror(name, line, column, msg):
+def printerror(line, column, msg):
+    global files
+    name = files[-1]
     print(name + ":" + str(line) + ":" + str(column) + ": " + "error: " + msg)
+    with open(name, 'r') as f:
+        txt = f.readlines()
+        print(txt[line-1][:-1])
+        print(" " * column + "↑")
 
 
 def parse_text(txt):
@@ -111,6 +118,8 @@ if __name__ == "__main__":
     f = args.file[0]
     txt = f.read()
 
+    files.append(f.name)
+
     tree = parse_text(txt)
 
     if args.ast:
@@ -125,9 +134,7 @@ if __name__ == "__main__":
     try:
         ir = codegen.gen_ir(tree)
     except CodegenException as ex:
-        printerror(f.name, ex.line, ex.column, ex.msg)
-        print(txt.splitlines()[ex.line-1])
-        print(" " * ex.column + "↑")
+        printerror(ex.line, ex.column, ex.msg)
         quit()
 
     if args.ir:
@@ -140,3 +147,5 @@ if __name__ == "__main__":
         # compile to file
         print("Compile not ready yet :(")
         pass
+
+    files.pop()

@@ -799,10 +799,12 @@ class Codegen(LangVisitor):
         name = ctx.name.text
 
         with open("./stdlib/" + name + ".pclang") as f:
-            from main import parse_text
+            from main import parse_text, files
+            files.append(f.name)
             tree = parse_text(f.read())
             codegen = Codegen(self.target_machine)
             module = codegen.gen_ir(tree)
+            files.pop()
 
             for f in module.functions:
                 if not f.name in self.module.globals:
