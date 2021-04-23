@@ -12,7 +12,7 @@ NL: ('\r'? '\n' ' '*);
 WS: ' '+ -> skip;
 
 COMMENT: '#=' .*? '=#' -> skip;
-COMMENT_LINE: '#' .*? ('\n' | EOF) -> skip;
+COMMENT_LINE: '#' (~('\n'))* -> skip;
 
 INT: '-'?[0-9]+;
 FLOAT: '-'?([0-9]* '.' [0-9]+) | ([0-9]+ '.' [0-9]*);
