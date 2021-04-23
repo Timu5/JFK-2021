@@ -17,6 +17,7 @@ class Codegen(LangVisitor):
         self.counter = 0
         self.locals = {}
         self.structs = {}
+        self.loops = []
 
     def get_uniq(self):
         self.counter += 1
@@ -531,6 +532,8 @@ class Codegen(LangVisitor):
         w_body_block = self.builder.append_basic_block("w_body")
         w_after_block = self.builder.append_basic_block("w_after")
 
+        self.loops.append(w_after_block)
+
         self.builder.cbranch(cond, w_body_block, w_after_block)
 
         self.builder.position_at_start(w_body_block)
@@ -542,6 +545,8 @@ class Codegen(LangVisitor):
 
         self.builder.position_at_start(w_after_block)
 
+        self.loops.pop()
+
     def visitForLoop(self, ctx: LangParser.ForLoopContext):
         cond = self.visit(ctx.b)
         cond = self.convert_to_i1(cond, ctx)
@@ -550,6 +555,8 @@ class Codegen(LangVisitor):
 
         w_body_block = self.builder.append_basic_block("w_body")
         w_after_block = self.builder.append_basic_block("w_after")
+
+        self.loops.append(w_after_block)
 
         self.builder.cbranch(cond, w_body_block, w_after_block)
 
@@ -563,12 +570,15 @@ class Codegen(LangVisitor):
 
         self.builder.position_at_start(w_after_block)
 
-    '''def visitBlock(self, ctx: LangParser.BlockContext):
-        statements = []
-        for stm in ctx.children:
-            if not hasattr(stm, 'symbol'):
-                statements.append(self.visit(stm))
-        return statements'''
+        self.loops.pop()
+
+
+    def visitBreak(self, ctx:LangParser.BreakContext):
+        end = self.loops.pop()
+        self.builder.branch(end)
+
+    def visitContinue(self, ctx:LangParser.ContinueContext):
+        raise CodegenException(ctx.start, "contiune not implemented")
 
     def visitDeclaration(self, ctx: LangParser.DeclarationContext):
         if ctx.name.text in self.locals:

@@ -72,6 +72,8 @@ statement:
 	)?																				# conditional
 	| 'while' value = expr ':' INDENT block = statements DEDENT						# loop
 	| 'for' a = expr ';' b = expr ';' c = expr ':' INDENT block = statements DEDENT	# forLoop
+	| 'break'																		# break
+	| 'continue'																	# continue
 	| name = ID (
 		((':' vartype = vtype)? ('=' value = expr)?)
 		| (':=' value = expr)
