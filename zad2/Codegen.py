@@ -165,7 +165,10 @@ class Codegen(LangVisitor):
         return self.builder.load(newptr)
 
     def visitChar(self, ctx: LangParser.CharContext):
-        value = ord(ctx.getText()[1:-1])
+        text = ctx.getText()[1:-1]
+        if len(text) > 1:
+            text = text.encode('utf-8').decode('unicode_escape')
+        value = ord(text)
         return ir.Constant(SignedType(8, False), value)
 
     def visitCast(self, ctx: LangParser.CastContext):
