@@ -1,9 +1,20 @@
 extern printf(byte*, ...) -> int
 extern scanf(byte*, ...) -> int
 extern puts(byte*) -> int
+extern getchar() -> int
 
 fn println(str: string) -> void:
-    puts(str)
+    puts(str.ptr)
 
 fn print(str: string) -> void:
-    printf(str)
+    printf(str.ptr)
+
+fn readln() -> string:
+    output := ""
+    value := 0
+    while value != cast(int)'\n':
+        value = getchar()
+        #push(output, cast(byte)value)
+        output = output + " "
+        output[output.length - 1] = cast(byte)value
+    return output
