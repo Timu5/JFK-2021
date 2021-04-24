@@ -183,28 +183,51 @@ class Codegen(LangVisitor):
         value = ord(text)
         return ubyte(value)
 
+    def cast(self, value, vartype):
+        if isinstance(value.type, ir.IntType) and isinstance(vartype, ir.types._BaseFloatType):
+            if isSigned(value):
+                value = self.builder.sitofp(value, vartype)
+            else:
+                value = self.builder.uitofp(value, vartype)
+        elif isinstance(vartype, ir.IntType) and isinstance(value.type, ir.types._BaseFloatType):
+            if isSigned(value):
+                value = self.builder.fptosi(value, vartype)
+            else:
+                value = self.builder.fptoui(value, vartype)
+        elif isinstance(value.type, ir.IntType) and isinstance(vartype, ir.IntType):
+            if value.type.width > vartype.width:
+                value = self.builder.trunc(value, vartype)
+            else:
+                if isSigned(value):
+                    value = self.builder.sext(value, vartype)
+                else:
+                    value = self.builder.zext(value, vartype)
+        elif isinstance(value.type, ir.types._BaseFloatType) and isinstance(vartype, ir.types._BaseFloatType):
+            sizeleft = int(value.type.intrinsic_name[1:])
+            sizeright = int(vartype.intrinsic_name[1:])
+            if sizeright > sizeleft:
+                value = self.builder.fpext(value, vartype)
+            else:
+                value = self.builder.fptrunc(value, vartype)
+        elif isinstance(value.type, ir.PointerType) and isinstance(vartype, ir.PointerType):
+            value = self.builder.bitcast(value, vartype)
+        else:
+            return None
+
+        value.type = vartype
+
+        return value
+
+
     def visitCast(self, ctx: LangParser.CastContext):
         vartype = self.visit(ctx.vartype)
         value = self.visit(ctx.value)
 
         if vartype == value.type:
-            print("warning: casting to some type")
+            print("warning: casting to same type")
 
-        if isinstance(value.type, ir.IntType) and isinstance(vartype, ir.types._BaseFloatType):
-            # TODO: singed vs unsigned
-            value = self.builder.uitofp(value, vartype)
-        elif isinstance(vartype, ir.IntType) and isinstance(value.type, ir.types._BaseFloatType):
-            # TODO: singed vs unsigned
-            value = self.builder.fptoui(value, vartype)
-        elif isinstance(value.type, ir.IntType) and isinstance(vartype, ir.IntType):
-            if value.type.width > vartype.width:
-                value = self.builder.trunc(value, vartype)
-            elif value.type.width < vartype.width:
-                # TODO: singed vs unsigned
-                value = self.builder.sext(value, vartype)
-        elif isinstance(value.type, ir.PointerType) and isinstance(vartype, ir.PointerType):
-            value = self.builder.bitcast(value, vartype)
-        else:
+        value = self.cast(value, vartype)
+        if value is None:
             raise CodegenException(ctx.start, "wrong type to cast")
 
         return value
@@ -308,7 +331,6 @@ class Codegen(LangVisitor):
 
         var = self.module.get_global(name)
         if not var is None:
-            # TODO: check how this works with arrays and strings
             return var
 
         raise CodegenException(ctx.start, "unknown variable")
