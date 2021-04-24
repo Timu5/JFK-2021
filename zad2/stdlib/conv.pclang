@@ -1,0 +1,14 @@
+extern atoi(byte*) -> int
+extern atof(byte*) -> double
+
+fn parseInt(str: string) -> int:
+    v := atoi(str.ptr)
+    return v
+
+fn parseFloat(str: string) -> float:
+    v := atof(str.ptr)
+    return cast(float)v
+
+fn parseDouble(str: string) -> double:
+    v := atof(str.ptr)
+    return v
