@@ -385,17 +385,19 @@ class Codegen(LangVisitor):
 
     def promote(self, left, right, ctx):
         # TODO: Add difrent types and make this more generic
-        if isinstance(left.type, ir.IntType) and isinstance(right.type, ir.FloatType):
-            left = self.builder.uitofp(left, ir.FloatType())
-        elif isinstance(right.type, ir.IntType) and isinstance(left.type, ir.FloatType):
-            right = self.builder.uitofp(right, ir.FloatType())
+        if isinstance(left.type, ir.IntType) and isinstance(right.type, ir.types._BaseFloatType):
+            left = self.cast(left, right.type)
+        elif isinstance(right.type, ir.IntType) and isinstance(left.type, ir.types._BaseFloatType):
+            right = self.cast(right, left.type)
         elif isinstance(left.type, ir.IntType) and isinstance(right.type, ir.IntType):
             if left.type.width > right.type.width:
-                right = self.builder.sext(right, left.type) # TODO: singed vs unsigned
-            if left.type.width < right.type.width:
-                left = self.builder.sext(left, right.type) # TODO: singed vs unsigned
-        else:
-            raise CodegenException(ctx.start, "wrong type to promote")
+                right = self.cast(right, left.type)
+            elif left.type.width < right.type.width:
+                left = self.cast(left, right.type)
+            else:
+                raise CodegenException(ctx.start, "mix of signed and unsigned values")
+        #else:
+        #    raise CodegenException(ctx.start, "wrong type to promote")
         return left, right
 
     def visitBinary(self, ctx: LangParser.BinaryContext):
@@ -406,43 +408,49 @@ class Codegen(LangVisitor):
         if left.type != right.type:
             left, right = self.promote(left, right, ctx)
 
-        if isinstance(left.type, ir.IntType):
-            if op == LangLexer.PLUS:
-                return self.builder.add(left, right)
-            elif op == LangLexer.MINUS:
-                return self.builder.sub(left, right)
-            elif op == LangLexer.MULT:
-                return self.builder.mul(left, right)
-            elif op == LangLexer.DIV:
-                if left.type.is_signed and right.type.is_signed:
-                    return self.builder.sdiv(left, right)
-                elif left.type.is_unsigned and right.type.is_unsigned:
-                    return self.builder.udiv(left, right)
-                else:
-                    raise CodegenException(
-                        ctx.op.start, "mix between signed and unsigned values")
+        if left.type == right.type:
+            if isinstance(left.type, ir.IntType):
+                if op == LangLexer.PLUS:
+                    return self.builder.add(left, right)
+                elif op == LangLexer.MINUS:
+                    return self.builder.sub(left, right)
+                elif op == LangLexer.MULT:
+                    return self.builder.mul(left, right)
+                elif op == LangLexer.DIV:
+                    if isSigned(left) and isSigned(right):
+                        return self.builder.sdiv(left, right)
+                    elif isUnsgined(left) and isUnsgined(right):
+                        return self.builder.udiv(left, right)
+                    else:
+                        raise CodegenException(
+                            ctx.op.start, "mix between signed and unsigned values")
 
-        elif isinstance(left.type, ir.FloatType):
-            if op == LangLexer.PLUS:
-                return self.builder.fadd(left, right)
-            elif op == LangLexer.MINUS:
-                return self.builder.fsub(left, right)
-            elif op == LangLexer.MULT:
-                return self.builder.fmul(left, right)
-            elif op == LangLexer.DIV:
-                return self.builder.fdiv(left, right)
+            elif isinstance(left.type, ir.FloatType):
+                if op == LangLexer.PLUS:
+                    return self.builder.fadd(left, right)
+                elif op == LangLexer.MINUS:
+                    return self.builder.fsub(left, right)
+                elif op == LangLexer.MULT:
+                    return self.builder.fmul(left, right)
+                elif op == LangLexer.DIV:
+                    return self.builder.fdiv(left, right)
 
-        elif isinstance(left.type, SizedArrayType):
-            if op != LangLexer.PLUS:
-                raise CodegenException(ctx.op.start, "can only add arrays")
-            a = left.type.elements[1].pointee.element
-            el_size = ir.Constant(SignedType(64, False), a.get_abi_size(self.target_machine.target_data))
-            return self.builder.call(self.runtime['array_add'], [left, right, el_size, self.runtime['GC_malloc']])
+            elif isinstance(left.type, StringType) or isinstance(right.type, StringType):
+                if op != LangLexer.PLUS:
+                    raise CodegenException(ctx.op.start, "can only add to strings")
+                return self.builder.call(self.runtime['string_add'], [left, right, self.runtime['GC_malloc_atomic']])
+        
+            elif isinstance(left.type, SizedArrayType):
+                if op != LangLexer.PLUS:
+                    raise CodegenException(ctx.op.start, "can only add to arrays")
+                a = left.type.elements[1].pointee.element
+                el_size = ir.Constant(ulong, a.get_abi_size(self.target_machine.target_data))
+                return self.builder.call(self.runtime['array_add'], [left, right, el_size, self.runtime['GC_malloc']])
 
-        elif isinstance(left.type, StringType):
-            if op != LangLexer.PLUS:
-                raise CodegenException(ctx.op.start, "can only add strings")
-            return self.builder.call(self.runtime['string_add'], [left, right, self.runtime['GC_malloc_atomic']])
+        else:
+            #if isinstance(left.type, SizedArrayType) and isinstance(right.type, left.type.element):
+            #    pass
+            raise CodegenException(ctx.start, "dont know how to perform binary operation on this types")
 
 
         raise CodegenException(ctx.start, "unsuported types in binary")
