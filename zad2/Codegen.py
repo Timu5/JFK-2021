@@ -407,6 +407,11 @@ class Codegen(LangVisitor):
             left = self.cast(left, right.type)
         elif isinstance(right.type, ir.IntType) and isinstance(left.type, ir.types._BaseFloatType):
             right = self.cast(right, left.type)
+        elif isinstance(right.type, ir.types._BaseFloatType) and isinstance(left.type, ir.types._BaseFloatType):
+            if int(right.type.intrinsic_name[1:]) > int(left.type.intrinsic_name[1:]):
+                left = self.cast(left, right.type)
+            else:
+                right = self.cast(right, left.type)
         elif isinstance(left.type, ir.IntType) and isinstance(right.type, ir.IntType):
             if left.type.width > right.type.width:
                 right = self.cast(right, left.type)
@@ -443,7 +448,7 @@ class Codegen(LangVisitor):
                         raise CodegenException(
                             ctx.op.start, "mix between signed and unsigned values")
 
-            elif isinstance(left.type, ir.FloatType):
+            elif isinstance(left.type, ir.types._BaseFloatType):
                 if op == LangLexer.PLUS:
                     return self.builder.fadd(left, right)
                 elif op == LangLexer.MINUS:
