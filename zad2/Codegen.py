@@ -32,24 +32,24 @@ class Codegen(LangVisitor):
         return self.module
 
     def visitNumber(self, ctx: LangParser.NumberContext):
-        valtype = SignedType(32, True)
+        valtype = int_
         if not ctx.literal is None:
             if ctx.literal.text == 'u':
-                valtype = SignedType(32, False)
+                valtype = uint
             elif ctx.literal.text == 'i':
-                valtype = SignedType(32, True)
+                valtype = int_
             elif ctx.literal.text == 'ul':
-                valtype = SignedType(64, False)
+                valtype = ulong
             elif ctx.literal.text == 'l':
-                valtype = SignedType(64, True)
+                valtype = long_
             elif ctx.literal.text == 'us':
-                valtype = SignedType(16, False)
+                valtype = ushort
             elif ctx.literal.text == 's':
-                valtype = SignedType(16, True)
+                valtype = short_
             elif ctx.literal.text == 'ub':
-                valtype = SignedType(8, False)
+                valtype = ubyte
             elif ctx.literal.text == 'b':
-                valtype = SignedType(8, True)
+                valtype = byte_
             else:
                 raise CodegenException(ctx.start, "unknown interger literal")
         return ir.Constant(valtype, int(ctx.value.text))
@@ -90,7 +90,7 @@ class Codegen(LangVisitor):
     def visitString(self, ctx: LangParser.StringContext):
         text = ctx.getText()[
             1:-1].encode('utf-8').decode('unicode_escape') + "\x00"
-        text_type = ir.ArrayType(SignedType(8, False), len(text))
+        text_type = ir.ArrayType(ubyte, len(text))
         text_const = ir.Constant(text_type, bytearray(text.encode("utf8")))
 
         if self.builder is None:
@@ -99,10 +99,10 @@ class Codegen(LangVisitor):
             global_arr.global_constant = False
             global_arr.initializer = text_const
 
-            global_gep = global_arr.gep([ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+            global_gep = global_arr.gep([int_(0), int_(0)])
             global_bit = global_gep.bitcast(ir.ArrayType(text_type.element, 1).as_pointer())
 
-            return ir.Constant(StringType(), [ir.Constant(SignedType(64, False), len(text)-1), global_bit])
+            return ir.Constant(StringType(), [ulong(len(text)-1), global_bit])
 
         ptr = self.builder.alloca(text_type)
         self.builder.store(text_const, ptr)
@@ -110,13 +110,13 @@ class Codegen(LangVisitor):
         new_array_type = StringType()
         newptr = self.builder.alloca(new_array_type)
         
-        ptr = self.builder.gep(ptr, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+        ptr = self.builder.gep(ptr, [int_(0), int_(0)])
         ptr = self.builder.bitcast(ptr, ir.ArrayType(text_type.element, 1).as_pointer())
         
-        ptr_size = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 0)])
-        ptr_ptr = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 1)])
+        ptr_size = self.builder.gep(newptr, [int_(0), int_(0)])
+        ptr_ptr = self.builder.gep(newptr, [int_(0), int_(1)])
         
-        self.builder.store(ir.Constant(SignedType(64, False), len(text)-1), ptr_size)
+        self.builder.store(ulong(len(text)-1), ptr_size)
         self.builder.store(ptr, ptr_ptr)
 
         return self.builder.load(newptr)
@@ -148,16 +148,16 @@ class Codegen(LangVisitor):
             global_arr.global_constant = False
             global_arr.initializer = array
 
-            global_gep = global_arr.gep([ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+            global_gep = global_arr.gep([int_(0), int_(0)])
             global_bit = global_gep.bitcast(ir.ArrayType(args[0].type, 1).as_pointer())
 
-            return ir.Constant(SizedArrayType(first_type), [ir.Constant(SignedType(64, False), len(args)), global_bit])
+            return ir.Constant(SizedArrayType(first_type), [ulong(len(args)), global_bit])
         
         ptr = self.builder.alloca(array_type)
 
         if not const:
             for i, x in enumerate(args):
-                el_ptr = self.builder.gep(ptr, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), i)])
+                el_ptr = self.builder.gep(ptr, [int_(0), int_(i)])
                 self.builder.store(x, el_ptr)
         else:
             self.builder.store(array, ptr)
@@ -165,13 +165,13 @@ class Codegen(LangVisitor):
         new_array_type = SizedArrayType(args[0].type)
         newptr = self.builder.alloca(new_array_type)
         
-        ptr = self.builder.gep(ptr, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+        ptr = self.builder.gep(ptr, [int_(0), int_(0)])
         ptr = self.builder.bitcast(ptr, ir.ArrayType(args[0].type, 1).as_pointer())
         
-        ptr_size = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 0)])
-        ptr_ptr = self.builder.gep(newptr, [ir.Constant(SignedType(32, False), 0), ir.Constant(SignedType(32, False), 1)])
+        ptr_size = self.builder.gep(newptr, [int_(0), int_(0)])
+        ptr_ptr = self.builder.gep(newptr, [int_(0), int_(1)])
         
-        self.builder.store(ir.Constant(SignedType(64, False), len(args)), ptr_size)
+        self.builder.store(ulong(len(args)), ptr_size)
         self.builder.store(ptr, ptr_ptr)
 
         return self.builder.load(newptr)
@@ -181,7 +181,7 @@ class Codegen(LangVisitor):
         if len(text) > 1:
             text = text.encode('utf-8').decode('unicode_escape')
         value = ord(text)
-        return ir.Constant(SignedType(8, False), value)
+        return ubyte(value)
 
     def visitCast(self, ctx: LangParser.CastContext):
         vartype = self.visit(ctx.vartype)
@@ -229,12 +229,12 @@ class Codegen(LangVisitor):
                 ctx.start, "array index need to be of int type")
 
         ptr = self.builder.gep(
-            primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 1)])
+            primary, [int_(0), int_(1)])
 
         ptr = self.builder.load(ptr)
 
         ptr = self.builder.gep(
-            ptr, [ir.Constant(SignedType(32, True), 0), expr])
+            ptr, [int_(0), expr])
         return self.builder.load(ptr)
 
     def visitUnary(self, ctx: LangParser.UnaryContext):
@@ -262,7 +262,7 @@ class Codegen(LangVisitor):
         name = ctx.children[2].getText()
 
         if name == 'sizeof':
-            return ir.Constant(SignedType(64, False), primary.type.get_abi_size(self.target_machine.target_data))
+            return ir.Constant(ulong, primary.type.get_abi_size(self.target_machine.target_data))
         elif isinstance(primary.type, SizedArrayType) or isinstance(primary.type, StringType):
             if not isinstance(primary, ir.LoadInstr):
                 raise CodegenException(
@@ -271,12 +271,12 @@ class Codegen(LangVisitor):
             self.builder.block.instructions.pop()
             if name == 'length':
                 ptr = self.builder.gep(
-                    primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 0)])
+                    primary, [int_(0), int_(0)])
 
                 return self.builder.load(ptr)
             elif name == 'ptr':
                 ptr = self.builder.gep(
-                    primary, [ir.Constant(SignedType(32, True), 0), ir.Constant(SignedType(32, True), 1)])
+                    primary, [int_(0), int_(1)])
 
                 ptr = self.builder.load(ptr)
 
@@ -299,7 +299,7 @@ class Codegen(LangVisitor):
             self.builder.block.instructions.pop()
 
         ptr = self.builder.gep(primary, [ir.Constant(
-            SignedType(32, True), 0), ir.Constant(SignedType(32, True), idx)])
+            int_, 0), int_(idx)])
         return self.builder.load(ptr)
 
     def getVar(self, name, ctx):
@@ -434,9 +434,9 @@ class Codegen(LangVisitor):
             left, right = self.promote(left, right, ctx)
 
         if isinstance(left.type, ir.IntType):
-            if left.type.is_signed and right.type.is_signed:
+            if isSigned(left) and isSigned(right):
                 return self.builder.icmp_signed(op, left, right)
-            elif left.type.is_unsigned and right.type.is_unsigned:
+            elif isUnsgined(left) and isUnsgined(right):
                 return self.builder.icmp_unsigned(op, left, right)
             else:
                 raise CodegenException(
@@ -475,7 +475,7 @@ class Codegen(LangVisitor):
             if isinstance(arg_llvm.type, StringType):
                 if isinstance(fn.args[i].type, ir.PointerType):
                     if fn.args[i].type.pointee.width == 8:
-                        arg_llvm = self.builder.gep(arg_llvm.operands[0], [ir.Constant(SignedType(32, False), 0),ir.Constant(SignedType(32, False), 1)])
+                        arg_llvm = self.builder.gep(arg_llvm.operands[0], [int_(0),int_(1)])
                         arg_llvm = self.builder.load(arg_llvm)
                         arg_llvm = self.builder.bitcast(arg_llvm, fn.args[i].type)
             elif fn.ftype.var_arg and isinstance(arg_llvm.type, ir.FloatType):
@@ -665,21 +665,21 @@ class Codegen(LangVisitor):
         name = ctx.getText()
 
         if name == "int":
-            return SignedType(32, True)
+            return int_
         elif name == "uint":
-            return SignedType(32, False)
+            return uint
         elif name == "byte":
-            return SignedType(8, True)
+            return byte_
         elif name == "ubyte":
-            return SignedType(8, False)
+            return ubyte
         elif name == "short":
-            return SignedType(16, True)
+            return short_
         elif name == "ushort":
-            return SignedType(16, False)
+            return ushort
         elif name == "long":
-            return SignedType(64, True)
+            return long_
         elif name == "ulong":
-            return SignedType(64, False)
+            return ulong
         elif name == "half":
             return ir.HalfType()
         elif name == "float":
@@ -697,6 +697,8 @@ class Codegen(LangVisitor):
 
     def visitPointerType(self, ctx: LangParser.PointerTypeContext):
         typ = self.visit(ctx.children[0])
+        if isinstance(typ, ir.VoidType):
+            typ = voidptr
         return typ.as_pointer()
 
     def visitArrayType(self, ctx: LangParser.ArrayTypeContext):

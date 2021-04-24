@@ -9,29 +9,51 @@ class CodegenException(Exception):
         super().__init__(self.msg)
 
 
-class SignedType(ir.IntType):
-    def __new__(cls, value, *args, **kwargs):
-        return ir.IntType.__new__(cls, value)
+class UnsignedType(ir.IntType):
+    pass
 
-    def __init__(self, size, signed):
-        self.is_signed = signed
-        self.is_unsigned = not signed
+
+class SignedType(ir.IntType):
+    pass
+
+
+int_ = SignedType(32)
+uint = UnsignedType(32)
+long_ = SignedType(64)
+ulong = UnsignedType(64)
+short_ = SignedType(16)
+ushort = UnsignedType(16)
+byte_ = SignedType(8)
+ubyte = UnsignedType(8)
+
+voidptr = ir.IntType(8).as_pointer()
 
 
 class SizedArrayType(ir.LiteralStructType):
     def __init__(self, element_type):
-        super().__init__([SignedType(64, False),
-                          ir.ArrayType(element_type, 1).as_pointer()])
+        super().__init__([ulong, ir.ArrayType(element_type, 1).as_pointer()])
         self.element = element_type
+
 
 class StringType(ir.LiteralStructType):
     def __init__(self):
-        super().__init__([SignedType(64, False),
-                          ir.ArrayType(SignedType(8, False), 1).as_pointer()])
-        self.element = SignedType(8, False)
+        super().__init__([ulong, ir.ArrayType(ubyte, 1).as_pointer()])
+        self.element = ubyte
 
 
 def isNumber(x):
     if isinstance(x.type, ir.IntType) or isinstance(x.type, ir.types._BaseFloatType):
+        return True
+    return False
+
+
+def isUnsgined(x):
+    if isinstance(x.type, UnsignedType):
+        return True
+    return False
+
+
+def isSigned(x):
+    if isinstance(x.type, SignedType):
         return True
     return False
