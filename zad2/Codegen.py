@@ -589,6 +589,10 @@ class Codegen(LangVisitor):
 
 
     def visitBreak(self, ctx:LangParser.BreakContext):
+        if not ctx.number is None:
+            number = int(ctx.number.text)
+            for i in range(number):
+                end = self.loops.pop()
         end = self.loops.pop()
         self.builder.branch(end)
 
