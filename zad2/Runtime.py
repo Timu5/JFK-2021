@@ -24,4 +24,8 @@ def get_runtime_functions(module):
 
     runtime["string_add"] = ir.Function(module, ir.FunctionType(StringType(), [StringType(), StringType(), ir.FunctionType(voidptr, [ulong]).as_pointer()]), name="string_add")
 
+    runtime["tostr_ulong"] = ir.Function(module, ir.FunctionType(StringType(), [ulong, ir.FunctionType(voidptr, [ulong]).as_pointer()]), name="tostr_ulong")
+    runtime["tostr_slong"] = ir.Function(module, ir.FunctionType(StringType(), [long_, ir.FunctionType(voidptr, [ulong]).as_pointer()]), name="tostr_slong")
+    runtime["tostr_double"] = ir.Function(module, ir.FunctionType(StringType(), [ir.DoubleType(), ir.FunctionType(voidptr, [ulong]).as_pointer()]), name="tostr_double")
+
     return runtime

@@ -280,12 +280,32 @@ class Codegen(LangVisitor):
 
         return primary
 
+    def toStr(self, ctx, value):
+        if isinstance(value.type, StringType):
+                return value
+        elif isinstance(value.type, UnsignedType):
+            if value.type != ulong:
+                value = self.cast(value, ulong)
+            return self.builder.call(self.runtime['tostr_ulong'], [value, self.runtime['GC_malloc_atomic']])
+        elif isinstance(value.type, SignedType):
+            if value.type != long_:
+                value = self.cast(value, ulong)
+            return self.builder.call(self.runtime['tostr_slong'], [value, self.runtime['GC_malloc_atomic']])
+        elif isinstance(value.type, ir.types._BaseFloatType):
+            if value.type != ir.DoubleType():
+                value = self.cast(value, ir.DoubleType())
+            return self.builder.call(self.runtime['tostr_double'], [value, self.runtime['GC_malloc_atomic']])
+        
+        raise CodegenException(ctx.start, "dont know how to create string from this type")
+
     def visitMember(self, ctx: LangParser.MemberContext):
-        primary = self.visit(ctx.children[0])  # maybe dont pull whole object?
+        primary = self.visit(ctx.children[0])
         name = ctx.children[2].getText()
 
         if name == 'sizeof':
             return ir.Constant(ulong, primary.type.get_abi_size(self.target_machine.target_data))
+        elif name == 'str':
+            return self.toStr(ctx, primary)
         elif isinstance(primary.type, SizedArrayType) or isinstance(primary.type, StringType):
             if not isinstance(primary, ir.LoadInstr):
                 raise CodegenException(
@@ -293,13 +313,11 @@ class Codegen(LangVisitor):
             primary = primary.operands[0]
             self.builder.block.instructions.pop()
             if name == 'length':
-                ptr = self.builder.gep(
-                    primary, [int_(0), int_(0)])
+                ptr = self.builder.gep(primary, [int_(0), int_(0)])
 
                 return self.builder.load(ptr)
             elif name == 'ptr':
-                ptr = self.builder.gep(
-                    primary, [int_(0), int_(1)])
+                ptr = self.builder.gep(primary, [int_(0), int_(1)])
 
                 ptr = self.builder.load(ptr)
 
