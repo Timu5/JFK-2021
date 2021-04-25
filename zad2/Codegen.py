@@ -9,7 +9,8 @@ from Runtime import *
 
 class Codegen(LangParserVisitor):
 
-    def __init__(self, target_machine):
+    def __init__(self, driver, target_machine):
+        self.driver = driver
         self.target_machine = target_machine
         self.builder = None
         self.module = None
@@ -895,15 +896,8 @@ class Codegen(LangParserVisitor):
     def visitImportLib(self, ctx:LangParser.ImportLibContext):
         name = ctx.name.text
 
-        with open("./stdlib/" + name + ".pclang") as f:
-            from main import parse_text, files
-            files.append(f.name)
-            tree = parse_text(f.read())
-            codegen = Codegen(self.target_machine)
-            module = codegen.gen_ir(tree)
-            files.pop()
-
-            for f in module.functions:
-                if not f.name in self.module.globals:
-                    self.module.add_global(f)
-                    # TODO: finish me!
+        module = self.driver.compile_file("./stdlib/" + name + ".pclang", self.target_machine)
+        for f in module.functions:
+            if not f.name in self.module.globals:
+                self.module.add_global(f)
+                # TODO: finish me!
