@@ -545,7 +545,7 @@ class Codegen(LangParserVisitor):
 
         fn = self.module.get_global(name)
         # TODO: check if function and if fn exist
-        if fn is None:
+        if fn is None or not isinstance(fn, ir.Function):
             raise CodegenException(ctx.start, "cannot find function")
 
         if len(fn.args) != len(args):
@@ -561,8 +561,14 @@ class Codegen(LangParserVisitor):
                         arg_llvm = self.builder.gep(arg_llvm.operands[0], [int_(0),int_(1)])
                         arg_llvm = self.builder.load(arg_llvm)
                         arg_llvm = self.builder.bitcast(arg_llvm, fn.args[i].type)
-            elif fn.ftype.var_arg and isinstance(arg_llvm.type, ir.FloatType):
-                arg_llvm = self.builder.fpext(arg_llvm, ir.DoubleType())
+
+            if fn.ftype.var_arg and i >= len(fn.args):
+                # var arg
+                if isinstance(arg_llvm.type, ir.FloatType) or isinstance(arg_llvm.type, ir.HalfType):
+                    arg_llvm = self.builder.fpext(arg_llvm, ir.DoubleType())
+            else:
+                if fn.args[i].type != arg_llvm.type:
+                    raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type")
 
             irargs.append(arg_llvm)
 
@@ -592,6 +598,9 @@ class Codegen(LangParserVisitor):
         if not left.type.is_pointer:
             raise CodegenException(
                 ctx.start, "can only assign to variable, pointer, array element or struct member")
+
+        if right.type != left.type.pointee:
+            raise CodegenException(ctx.start, "types mismatch") 
 
         self.builder.store(right, left)
         return right
