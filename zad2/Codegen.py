@@ -52,7 +52,7 @@ class Codegen(LangParserVisitor):
             elif ctx.literal.text == 'b':
                 valtype = byte_
             else:
-                raise CodegenException(ctx.start, "unknown interger literal")
+                raise CodegenException(ctx.start, f"unknown interger literal '{ctx.literal.text}'")
         return ir.Constant(valtype, int(ctx.value.text))
 
     def visitFloat(self, ctx: LangParser.FloatContext):
@@ -65,7 +65,7 @@ class Codegen(LangParserVisitor):
             elif ctx.literal.text == 'd':
                 valtype = ir.DoubleType()
             else:
-                raise CodegenException(ctx.start, "unknown float literal")
+                raise CodegenException(ctx.start, f"unknown float literal '{ctx.literal.text}'")
         return ir.Constant(valtype, float(ctx.value.text))
 
     def visitAddress(self, ctx: LangParser.AddressContext):
@@ -78,14 +78,14 @@ class Codegen(LangParserVisitor):
             pass
         else:
             raise CodegenException(
-                ctx.start, "cannot obtain value of this element")
+                ctx.start, "cannot obtain address of this element")
 
         return value
 
     def visitDeref(self, ctx: LangParser.DerefContext):
         value = self.visit(ctx.value)
         if not isinstance(value.type, ir.PointerType):
-            raise CodegenException(ctx.start, "can only derefernece pointers")
+            raise CodegenException(ctx.start, f"can only derefernece pointers not {type2str(value.type)}")
         return self.builder.load(value)
 
     def visitFstring(self, ctx: LangParser.FstringContext):
@@ -252,13 +252,14 @@ class Codegen(LangParserVisitor):
     def visitCast(self, ctx: LangParser.CastContext):
         vartype = self.visit(ctx.vartype)
         value = self.visit(ctx.value)
+        oldtype = value.type
 
         if vartype == value.type:
             print("warning: casting to same type")
 
         value = self.cast(value, vartype)
         if value is None:
-            raise CodegenException(ctx.start, "wrong type to cast")
+            raise CodegenException(ctx.start, f"cannot cast from {type2str(oldtype)} to {type2str(vartype)}")
 
         return value
 
@@ -267,11 +268,10 @@ class Codegen(LangParserVisitor):
 
         if not isinstance(primary.type, SizedArrayType) and not isinstance(primary.type, StringType):
             raise CodegenException(
-                ctx.start, "not proper array")
+                ctx.start, "not a proper array to access")
         
         if not isinstance(primary, ir.LoadInstr):
-            raise CodegenException(
-                ctx.start, "hle?")
+            raise CodegenException(ctx.start, "hle?")
         primary = primary.operands[0]
         self.builder.block.instructions.pop()
 
@@ -279,15 +279,13 @@ class Codegen(LangParserVisitor):
 
         if not isinstance(expr.type, ir.IntType):
             raise CodegenException(
-                ctx.start, "array index need to be of int type")
+                ctx.children[2].start, f"array index need to be of int type, not {type2str(expr.type)}")
 
-        ptr = self.builder.gep(
-            primary, [int_(0), int_(1)])
+        ptr = self.builder.gep(primary, [int_(0), int_(1)])
 
         ptr = self.builder.load(ptr)
 
-        ptr = self.builder.gep(
-            ptr, [int_(0), expr])
+        ptr = self.builder.gep(ptr, [int_(0), expr])
         return self.builder.load(ptr)
 
     def visitUnary(self, ctx: LangParser.UnaryContext):
@@ -326,7 +324,7 @@ class Codegen(LangParserVisitor):
                 value = self.cast(value, ir.DoubleType())
             return self.builder.call(self.runtime['tostr_double'], [value, self.runtime['GC_malloc_atomic']])
         
-        raise CodegenException(ctx.start, "dont know how to create string from this type")
+        raise CodegenException(ctx.start, f"dont know how to create string from {type2str(value.type)}")
 
     def visitMember(self, ctx: LangParser.MemberContext):
         primary = self.visit(ctx.children[0])
@@ -377,11 +375,12 @@ class Codegen(LangParserVisitor):
         if name in self.locals:
             return self.locals[name]
 
-        var = self.module.get_global(name)
-        if not var is None:
-            return var
+        if name in self.module.globals:
+            var = self.module.get_global(name)
+            if not var is None:
+                return var
 
-        raise CodegenException(ctx.start, "unknown variable")
+        raise CodegenException(ctx.start, f"unknown variable {name}")
 
     def visitVar(self, ctx: LangParser.VarContext):
         name = ctx.getText()
@@ -400,7 +399,7 @@ class Codegen(LangParserVisitor):
         name = ctx.name.text
 
         if not name in self.structs:
-            raise CodegenException(ctx.start, "no struct with this name")
+            raise CodegenException(ctx.start, f'no struct with name "{name}"')
 
         vtype = self.module.context.get_identified_type(name)
 
@@ -503,10 +502,10 @@ class Codegen(LangParserVisitor):
         else:
             #if isinstance(left.type, SizedArrayType) and isinstance(right.type, left.type.element):
             #    pass
-            raise CodegenException(ctx.start, "dont know how to perform binary operation on this types")
+            raise CodegenException(ctx.start, f"dont know how to perform binary operation on {type2str(left.type)} and {type2str(right.type)}")
 
 
-        raise CodegenException(ctx.start, "unsuported types in binary")
+        raise CodegenException(ctx.start, f"unsuported types in binary {type2str(left.type)} and {type2str(right.type)}")
 
     def visitCondBinary(self, ctx: LangParser.CondBinaryContext):
         op = ctx.op.text
@@ -544,14 +543,16 @@ class Codegen(LangParserVisitor):
         name = ctx.name.text
         args = self.visit(ctx.arguments)
 
-        fn = self.module.get_global(name)
-        # TODO: check if function and if fn exist
+        fn = None
+        if name in self.module.globals:
+            fn = self.module.get_global(name)
+
         if fn is None or not isinstance(fn, ir.Function):
-            raise CodegenException(ctx.start, "cannot find function")
+            raise CodegenException(ctx.start, f'cannot find function "{name}"')
 
         if len(fn.args) != len(args):
             if not (fn.ftype.var_arg and len(fn.args) < len(args)):
-                raise CodegenException(ctx.start, "wrong args count")
+                raise CodegenException(ctx.start, f"wrong args count, expect {len(fn.args)} got {len(args)}")
 
         irargs = []
         for i, arg in enumerate(args):
@@ -569,7 +570,7 @@ class Codegen(LangParserVisitor):
                     arg_llvm = self.builder.fpext(arg_llvm, ir.DoubleType())
             else:
                 if fn.args[i].type != arg_llvm.type:
-                    raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type")
+                    raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type, expected type {type2str(fn.args[i].type)} got {type2str(arg_llvm.type)}")
 
             irargs.append(arg_llvm)
 
@@ -601,7 +602,7 @@ class Codegen(LangParserVisitor):
                 ctx.start, "can only assign to variable, pointer, array element or struct member")
 
         if right.type != left.type.pointee:
-            raise CodegenException(ctx.start, "types mismatch") 
+            raise CodegenException(ctx.start, f"types mismatch {type2str(left.type.pointee)} != {type2str(right.type)}") 
 
         self.builder.store(right, left)
         return right
@@ -682,6 +683,7 @@ class Codegen(LangParserVisitor):
 
 
     def visitBreak(self, ctx:LangParser.BreakContext):
+        # TODO: handle missing loop
         if not ctx.number is None:
             number = int(ctx.number.text)
             for i in range(number):
@@ -690,11 +692,11 @@ class Codegen(LangParserVisitor):
         self.builder.branch(end)
 
     def visitContinue(self, ctx:LangParser.ContinueContext):
-        raise CodegenException(ctx.start, "contiune not implemented")
+        raise CodegenException(ctx.start, "continue not implemented")
 
     def visitDeclaration(self, ctx: LangParser.DeclarationContext):
         if ctx.name.text in self.locals:
-            raise CodegenException(ctx.start, "variable redefinition")
+            raise CodegenException(ctx.start, f'variable "{ctx.name.text}" redefinition')
 
         if ctx.vartype is None and ctx.value is None:
             raise CodegenException(ctx.start, "variable need a type")
@@ -718,7 +720,7 @@ class Codegen(LangParserVisitor):
             vartype = self.visit(ctx.vartype)
             value = self.visit(ctx.value)
             if vartype != value.type:
-                raise CodegenException(ctx.vartype.start, "wrong types")
+                raise CodegenException(ctx.vartype.start, f"types mismatch {type2str(vartype)} != {type2str(value.type)}")
             ptr = self.builder.alloca(value.type)
             self.builder.store(value, ptr)
             self.locals[ctx.name.text] = ptr
@@ -736,7 +738,7 @@ class Codegen(LangParserVisitor):
             value = self.visit(ctx.value)
             if value.type != rtype:
                 raise CodegenException(
-                    ctx.start, "return need to have same type as function")
+                    ctx.start, f"return need to be {type2str(rtype)}, not {type2str(value.type)}")
             self.builder.ret(value)
 
     def visitGlobalVar(self, ctx: LangParser.GlobalVarContext):
@@ -798,8 +800,9 @@ class Codegen(LangParserVisitor):
         typ = self.visit(ctx.children[0])
         if ctx.size == None:
             return SizedArrayType(typ)
-        elements = int(ctx.size.text)
-        return ir.ArrayType(typ, elements)
+        raise CodegenException(ctx.start, "arrays with const size not supported")
+        #elements = int(ctx.size.text)
+        #return ir.ArrayType(typ, elements)
 
     def visitFnargs(self, ctx: LangParser.FnargsContext):
         if ctx.children is None:
@@ -848,7 +851,7 @@ class Codegen(LangParserVisitor):
             if isinstance(func.ftype.return_type, ir.VoidType):
                 self.builder.ret_void()
             else:
-                raise CodegenException(ctx.start, "missing return")
+                raise CodegenException(ctx.start, f'missing return in "{name}" function')
 
         self.locals = None
         self.builder = None
@@ -887,7 +890,7 @@ class Codegen(LangParserVisitor):
         members = self.visit(ctx.members)
 
         if name in self.structs:
-            raise CodegenException(ctx.start, "struct redefinition")
+            raise CodegenException(ctx.start, f'struct "{name}" redefinition')
 
         self.structs[name] = members
         b = self.module.context.get_identified_type(name)

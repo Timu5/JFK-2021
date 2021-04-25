@@ -56,7 +56,7 @@ statement:
 	| 'break' (number = INT)?														# break
 	| 'continue'																	# continue
 	| name = ID (
-		((':' vartype = vtype)? ('=' value = expr)?)
+		((':' vartype = vtype)|('=' value = expr))
 		| (':=' value = expr)
 	) NL												# declaration
 	| 'const' name = ID (':=' | '=') value = expr NL	# const

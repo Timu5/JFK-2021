@@ -26,6 +26,10 @@ ushort = UnsignedType(16)
 byte_ = SignedType(8)
 ubyte = UnsignedType(8)
 
+half_ = ir.HalfType()
+float_ = ir.FloatType()
+double_ = ir.DoubleType()
+
 voidptr = ir.IntType(8).as_pointer()
 
 
@@ -57,3 +61,41 @@ def isSigned(x):
     if isinstance(x.type, SignedType):
         return True
     return False
+
+def type2str(typ):
+    if typ == int_:
+        return "int"
+    elif typ == uint:
+        return "uint"
+    elif typ == long_:
+        return "long"
+    elif typ == ulong:
+        return "ulong"
+    elif typ == short_:
+        return "short"
+    elif typ == ushort:
+        return "ushort"
+    elif typ == byte_:
+        return "byte"
+    elif typ == ubyte:
+        return "ubyte"
+    elif typ == half_:
+        return "half"
+    elif typ == float_:
+        return "float"
+    elif typ == double_:
+        return "double"
+
+    elif isinstance(typ, StringType):
+        return "string"
+
+    elif isinstance(typ, SizedArrayType):
+        return type2str(typ.element) + "[]"
+
+    elif isinstance(typ, ir.PointerType):
+        return type2str(typ.pointee) + "*"
+
+    elif isinstance(typ, ir.IdentifiedStructType):
+        return typ.name
+
+    return "?"
