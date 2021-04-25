@@ -84,9 +84,12 @@ def printerror(line, column, msg):
 
 def parse_text(txt):
     lexer = LangLexer(InputStream(txt))
-    stream = CommonTokenStream(lexer)
-    parser = LangParser(stream)
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(MyErrorListener())
 
+    stream = CommonTokenStream(lexer)
+    
+    parser = LangParser(stream)
     parser.removeErrorListeners()
     parser.addErrorListener(MyErrorListener())
 
