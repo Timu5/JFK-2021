@@ -1,34 +1,14 @@
-grammar Lang;
+parser grammar LangParser;
 
-tokens {
-	INDENT,
-	DEDENT
+options {
+	tokenVocab = LangLexer;
 }
 
-import Indent;
+fstring: OPEN_STRING fstringElement* CLOSE_STRING;
 
-NL: ('\r'? '\n' ' '*);
-
-WS: ' '+ -> skip;
-
-COMMENT: '#=' .*? '=#' -> skip;
-COMMENT_LINE: '#' (~('\n'))* -> skip;
-
-INT: '-'? [0-9]+;
-FLOAT: '-'? ([0-9]* '.' [0-9]+) | ([0-9]+ '.' [0-9]*);
-ID: [_a-zA-Z][_0-9a-zA-Z]*;
-ESCAPE: '\\\'' | '\\"' | '\\\\' | '\\n' | '\\r'  | '\\t' | '\\b' | '\\f' |  '\\0' | ('\\x' [a-fA-F0-9][a-fA-F0-9]);
-CHAR: '\'' (~'\\'|ESCAPE) '\'';
-STRING: '"' (~('"')|ESCAPE)* '"';
-
-PLUS: '+';
-MINUS: '-';
-MULT: '*';
-DIV: '/';
-LPAREN: '(';
-RPAREN: ')';
-COMMA: ',';
-NOT: 'not';
+fstringElement:
+	TEXT								# rawString
+	| EXPR_ENTER value = expr RPAREN	# exprString;
 
 vtype:
 	ID								# basicType
@@ -42,7 +22,7 @@ primary:
 	| value = INT literal = ID?							# number
 	| value = FLOAT literal = ID?						# float
 	| CHAR												# char
-	| STRING											# string
+	| fstring											# string
 	| ID												# var
 	| '[' args ']'										# array
 	| name = ID '{' args '}'							# structVal
@@ -110,6 +90,14 @@ structMembers: (structMember NL)+;
 struct:
 	'struct' name = ID ':' INDENT members = structMembers DEDENT;
 
-importLib: 'import' name = ID NL;
+importLib: IMPORT name = ID NL;
 
+program: (
+		importLib
+		| function
+		| extern
+		| externVar
+		| globalVar
+		| struct
+	)* EOF;
 

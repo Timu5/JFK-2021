@@ -2,12 +2,12 @@ from llvmlite import ir
 import llvmlite.binding as llvm
 from antlr4 import *
 from generated.LangLexer import LangLexer
-from generated.LangVisitor import LangVisitor
+from generated.LangParserVisitor import LangParserVisitor
 from generated.LangParser import LangParser
 from Utils import *
 from Runtime import *
 
-class Codegen(LangVisitor):
+class Codegen(LangParserVisitor):
 
     def __init__(self, target_machine):
         self.target_machine = target_machine
@@ -87,9 +87,19 @@ class Codegen(LangVisitor):
             raise CodegenException(ctx.start, "can only derefernece pointers")
         return self.builder.load(value)
 
-    def visitString(self, ctx: LangParser.StringContext):
-        text = ctx.getText()[
-            1:-1].encode('utf-8').decode('unicode_escape') + "\x00"
+    def visitFstring(self, ctx: LangParser.FstringContext):
+        if len(ctx.children) <= 2:
+            # empty string
+            return [self.createString("")]
+        elements = []
+        for child in ctx.children[1:-1]:
+            el = self.visit(child)
+            elements.append(el)
+        
+        return elements
+
+    def createString(self, text):
+        text += '\x00'
         text_type = ir.ArrayType(ubyte, len(text))
         text_const = ir.Constant(text_type, bytearray(text.encode("utf8")))
 
@@ -120,6 +130,25 @@ class Codegen(LangVisitor):
         self.builder.store(ptr, ptr_ptr)
 
         return self.builder.load(newptr)
+
+    def visitRawString(self, ctx:LangParser.RawStringContext):
+        text = text = ctx.getText().encode('utf-8').decode('unicode_escape');
+        return self.createString(text)
+
+    def visitExprString(self, ctx:LangParser.ExprStringContext):
+        value = self.visit(ctx.value)
+        return self.toStr(ctx, value)
+
+    def visitString(self, ctx: LangParser.StringContext):
+        elements = self.visit(ctx.children[0])
+
+        while len(elements) > 1:
+            left = elements.pop(0)
+            right = elements.pop(0)
+            c = self.builder.call(self.runtime['string_add'], [left, right, self.runtime['GC_malloc_atomic']])
+            elements.insert(0, c)
+
+        return elements[0]
 
     def visitArray(self, ctx: LangParser.ArrayContext):
         args = self.visit(ctx.children[1])
@@ -510,6 +539,7 @@ class Codegen(LangVisitor):
         return args
 
     def visitCall(self, ctx: LangParser.BinaryContext):
+        # TODO: make this more generic!
         name = ctx.name.text
         args = self.visit(ctx.arguments)
 
@@ -818,7 +848,6 @@ class Codegen(LangVisitor):
         vartype = self.visit(ctx.vartype)
         global_text = ir.GlobalVariable(self.module, vartype, name=name)
         global_text.linkage = 'external'
-        global_text.global_constant = False
         return global_text
 
     def visitExtern(self, ctx: LangParser.ExternContext):

@@ -1,4 +1,5 @@
-grammar Indent;
+lexer grammar Indent;
+
 
 @lexer::header{
 from antlr_denter.DenterHelper import DenterHelper
@@ -19,5 +20,4 @@ def nextToken(self):
     if not self.denter:
         self.denter = self.MyCoolDenter(self, self.NL, LangParser.INDENT, LangParser.DEDENT, False)
     return self.denter.next_token()
-
 }
