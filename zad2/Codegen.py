@@ -308,6 +308,46 @@ class Codegen(LangParserVisitor):
 
         return primary
 
+    def visitPre(self, ctx:LangParser.PreContext):
+        op = ctx.op.text
+        primary = self.visit(ctx.value)
+
+        if not isNumber(primary):
+            raise CodegenException(ctx.start, f"can only apply {op} on numbers")
+        
+        if not isinstance(primary, ir.LoadInstr):
+            raise CodegenException(ctx.start, f"wrong type to perform {op} on")
+
+        value = primary.type(1 if op == '++' else -1)
+
+        r = None
+        if isinstance(primary.type, ir.types._BaseFloatType):
+            r = self.builder.fadd(primary, value)
+        else:
+            r = self.builder.add(primary, value)
+        self.builder.store(r, primary.operands[0])
+        return r
+
+    def visitPost(self, ctx:LangParser.PostContext):
+        op = ctx.op.text
+        primary = self.visit(ctx.value)
+
+        if not isNumber(primary):
+            raise CodegenException(ctx.start, f"can only apply {op} on numbers")
+
+        if not isinstance(primary, ir.LoadInstr):
+            raise CodegenException(ctx.start, f"wrong type to perform {op} on")
+        
+        value = primary.type(1 if op == '++' else -1)
+
+        r = None
+        if isinstance(primary.type, ir.types._BaseFloatType):
+            r = self.builder.fadd(primary, value)
+        else:
+            r = self.builder.add(primary, value)
+        self.builder.store(r, primary.operands[0])
+        return primary
+
     def toStr(self, ctx, value):
         if isinstance(value.type, StringType):
                 return value

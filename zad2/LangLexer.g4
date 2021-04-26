@@ -30,7 +30,9 @@ ESCAPE:
 CHAR: '\'' (~'\\' | ESCAPE) '\'';
 
 PLUS: '+';
+DPLUS: '++';
 MINUS: '-';
+DMINUS: '--';
 MULT: '*';
 DIV: '/';
 LPAREN: '(' -> pushMode(DEFAULT_MODE);

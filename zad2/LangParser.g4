@@ -19,21 +19,8 @@ vtype:
 args: (expr (COMMA expr)*)?;
 
 primary:
-	op = (PLUS | MINUS | NOT) value = primary			# unary
-	| value = INT literal = ID?							# number
-	| value = FLOAT literal = ID?						# float
-	| CHAR												# char
-	| fstring											# string
-	| ID												# var
-	| '[' args ']'										# array
-	| name = ID '{' args '}'							# structVal
-	| 'cast' '(' vartype = vtype ')' value = primary	# cast
-	| name = ID LPAREN arguments = args RPAREN			# call
-	| LPAREN expr RPAREN								# parenthesis
-	| primary '.' ID									# member
-	| primary '[' expr ']'								# index
-	| '&' value = primary								# address
-	| '*' value = primary								# deref;
+	| op = ('++' | '--') value = primary									# pre
+	| value = primary op = ('++' | '--')									# post;
 
 expr:
 	left = expr op = (MULT | DIV) right = expr							# binary
