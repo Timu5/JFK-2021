@@ -422,17 +422,20 @@ class Codegen(LangParserVisitor):
             if not var is None:
                 return var
 
+        if name in self.templates:
+            return self.templates[name]
+
         raise CodegenException(ctx.start, f"unknown symbol {name}")
 
     def visitVar(self, ctx: LangParser.VarContext):
         name = ctx.getText()
         var = self.getVar(name, ctx)
 
-        if var.type.is_pointer:
+        '''if var.type.is_pointer:
             if isinstance(var.type.pointee, ir.ArrayType):
-                return var
+                return var'''
 
-        if isinstance(var, ir.Function):
+        if isinstance(var, ir.Function) or isinstance(var, FunctionTemplate):
             return var
 
         return self.builder.load(var)
@@ -588,7 +591,36 @@ class Codegen(LangParserVisitor):
         args = self.visit(ctx.arguments)
 
         if not isinstance(fn, ir.Function):
-            if isinstance(fn.type, ir.PointerType) and isinstance(fn.type.pointee, ir.FunctionType):
+            if isinstance(fn, FunctionTemplate):
+                types = {}
+                i = 0
+                for x in fn.body.arguments.children:
+                    if not hasattr(x, 'symbol'):
+                        name = x.getText()
+                        if name in fn.types:
+                            # generic
+                            argtype = args[i].type
+                            if name in types:
+                                if types[name] != argtype:
+                                    raise CodegenException(ctx.start, f'type "{name}" redefintion')
+                            types[name] = argtype
+                            i += 1
+                # generate fn or get ready one
+                template = fn
+                oldtypes = self.types
+                oldlocals = self.locals
+                oldbuilder = self.builder
+                oldname = template.body.name.text
+
+                self.types = types
+                template.body.name.text += str(self.get_uniq())
+                fn = self.visit(template.body)
+
+                template.body.name.text = oldname
+                self.types = oldtypes
+                self.builder = oldbuilder
+                self.locals = oldlocals
+            elif isinstance(fn.type, ir.PointerType) and isinstance(fn.type.pointee, ir.FunctionType):
                 pass
             else:
                 raise CodegenException(ctx.start, f'"{ctx.value.getText()}" is not a function')
