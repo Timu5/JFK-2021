@@ -3,11 +3,19 @@ extern scanf(byte*, ...) -> int
 extern puts(byte*) -> int
 extern getchar() -> int
 
-fn println(str: string) -> void:
+fn _println(str: string) -> void:
     puts(str.ptr)
 
-fn print(str: string) -> void:
+fn _print(str: string) -> void:
     printf(str.ptr)
+
+template(T) 
+fn println(input: T) -> void:
+    _println(input.str)
+
+template(T) 
+fn print(input: T) -> void:
+    _print(input.str)
 
 fn readln() -> string:
     output := ""
