@@ -26,10 +26,11 @@ primary:
 	| fstring																# string
 	| ID																	# var
 	| '[' args ']'															# array
+	| name = ID '(' types = fnargs ')' '{' arguments = args '}'			# structValTemplate
 	| name = ID '{' args '}'												# structVal
 	| 'cast' '(' vartype = vtype ')' value = primary						# cast
+	| value = primary '(' types = fnargs ')' '(' arguments = args ')'	# callTemplate
 	| value = primary '(' arguments = args ')'								# call
-	| value = primary '(' argument = fnargs ')' '(' arguments = args ')'	# callTemplate
 	| LPAREN expr RPAREN													# parenthesis
 	| primary '.' ID														# member
 	| primary '[' expr ']'													# index
@@ -97,6 +98,14 @@ struct:
 
 importLib: IMPORT name = ID NL;
 
+rawArgs: (ID (COMMA ID)*)?;
+
+template:
+	'template' '(' arguments = rawArgs ')' NL (
+		tfunc = function
+		| tstruct = struct
+	);
+
 program: (
 		importLib
 		| function
@@ -104,5 +113,6 @@ program: (
 		| externVar
 		| globalVar
 		| struct
+		| template
 	)* EOF;
 

@@ -18,7 +18,9 @@ class Codegen(LangParserVisitor):
         self.counter = 0
         self.locals = {}
         self.structs = {}
+        self.templates = {}
         self.loops = []
+        self.types = {}
 
     def get_uniq(self):
         self.counter += 1
@@ -833,6 +835,8 @@ class Codegen(LangParserVisitor):
             return StringType()
         elif name in self.structs:
             return self.module.context.get_identified_type(name)
+        elif name in self.types:
+            return self.types[name]
 
         raise CodegenException(ctx.start, "unknown type")
 
@@ -908,6 +912,8 @@ class Codegen(LangParserVisitor):
         self.locals = None
         self.builder = None
 
+        return func
+
     def visitExternVar(self, ctx: LangParser.ExternVarContext):
         name = ctx.name.text
         vartype = self.visit(ctx.vartype)
@@ -956,3 +962,63 @@ class Codegen(LangParserVisitor):
             if not f.name in self.module.globals:
                 self.module.add_global(f)
                 # TODO: finish me!
+
+    def visitRawArgs(self, ctx: LangParser.RawArgsContext):
+        if ctx.children is None:
+            return []
+        args = []
+        for arg in ctx.children:
+            if arg.symbol.text != ',':
+                args.append(arg.symbol.text)
+        return args
+
+    def visitTemplate(self, ctx: LangParser.TemplateContext):
+        args = self.visit(ctx.arguments)
+
+        if not ctx.tstruct is None:
+            raise CodegenException(ctx.start, "struct template not implemented")
+        else:
+            # TODO: redefinition
+            self.templates[ctx.tfunc.name.text] = FunctionTemplate(ctx.tfunc, args)
+
+
+    def visitStructValTemplate(self, ctx: LangParser.StructValTemplateContext):
+        pass
+
+    def visitCallTemplate(self, ctx: LangParser.CallTemplateContext):
+        name = ctx.value.getText()
+        types = self.visit(ctx.types)
+        args = self.visit(ctx.arguments)
+
+        template = self.templates[name]
+
+        if len(types) != len(template.types):
+            raise CodegenException(ctx.start, "ehh not working :(")
+
+        # set types somehow
+
+        oldtypes = self.types
+        oldlocals = self.locals
+        oldbuilder = self.builder
+
+        self.types = {}
+        
+        for i in range(len(types)):
+            self.types[template.types[i]] = types[i]
+
+        oldname = template.body.name.text
+
+        template.body.name.text += str(self.get_uniq())
+
+        fn = self.visit(template.body)
+
+        template.body.name.text = oldname
+
+        self.types = oldtypes
+        self.builder = oldbuilder
+        self.locals = oldlocals
+
+        # TODO: check types
+
+        return self.builder.call(fn, args)
+

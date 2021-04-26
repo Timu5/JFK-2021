@@ -75,6 +75,7 @@ ELSE: 'else';
 WHILE: 'while';
 FOR: 'for';
 IMPORT: 'import';
+TEMPLATE: 'template';
 SLASH: '\\';
 ID: [_a-zA-Z][_0-9a-zA-Z]*;
 
