@@ -19,6 +19,22 @@ vtype:
 args: (expr (COMMA expr)*)?;
 
 primary:
+	op = (PLUS | MINUS | NOT) value = primary								# unary
+	| value = INT literal = ID?												# number
+	| value = FLOAT literal = ID?											# float
+	| CHAR																	# char
+	| fstring																# string
+	| ID																	# var
+	| '[' args ']'															# array
+	| name = ID '{' args '}'												# structVal
+	| 'cast' '(' vartype = vtype ')' value = primary						# cast
+	| value = primary '(' arguments = args ')'								# call
+	| value = primary '(' argument = fnargs ')' '(' arguments = args ')'	# callTemplate
+	| LPAREN expr RPAREN													# parenthesis
+	| primary '.' ID														# member
+	| primary '[' expr ']'													# index
+	| '&' value = primary													# address
+	| '*' value = primary													# deref
 	| op = ('++' | '--') value = primary									# pre
 	| value = primary op = ('++' | '--')									# post;
 
@@ -41,10 +57,11 @@ statement:
 	)?																				# conditional
 	| 'while' value = expr ':' INDENT block = statements DEDENT						# loop
 	| 'for' a = expr ';' b = expr ';' c = expr ':' INDENT block = statements DEDENT	# forLoop
-	| 'break' (number = INT)?														# break
-	| 'continue'																	# continue
+	| 'break' (number = INT)? NL													# break
+	| 'continue' NL																	# continue
 	| name = ID (
-		((':' vartype = vtype)|('=' value = expr))
+		(':' vartype = vtype)
+		| (':' vartype = vtype '=' value = expr)
 		| (':=' value = expr)
 	) NL												# declaration
 	| 'const' name = ID (':=' | '=') value = expr NL	# const

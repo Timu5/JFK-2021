@@ -85,6 +85,8 @@ def type2str(typ):
         return "float"
     elif typ == double_:
         return "double"
+    elif typ == ir.VoidType():
+        return "void";
 
     elif isinstance(typ, StringType):
         return "string"

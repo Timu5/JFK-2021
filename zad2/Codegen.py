@@ -56,14 +56,14 @@ class Codegen(LangParserVisitor):
         return ir.Constant(valtype, int(ctx.value.text))
 
     def visitFloat(self, ctx: LangParser.FloatContext):
-        valtype = ir.DoubleType()
+        valtype = double_
         if not ctx.literal is None:
             if ctx.literal.text == 'h':
-                valtype = ir.HalfType()
+                valtype = half_
             elif ctx.literal.text == 'f':
-                valtype = ir.FloatType()
+                valtype = float_
             elif ctx.literal.text == 'd':
-                valtype = ir.DoubleType()
+                valtype = double_
             else:
                 raise CodegenException(ctx.start, f"unknown float literal '{ctx.literal.text}'")
         return ir.Constant(valtype, float(ctx.value.text))
@@ -360,8 +360,8 @@ class Codegen(LangParserVisitor):
                 value = self.cast(value, ulong)
             return self.builder.call(self.runtime['tostr_slong'], [value, self.runtime['GC_malloc_atomic']])
         elif isinstance(value.type, ir.types._BaseFloatType):
-            if value.type != ir.DoubleType():
-                value = self.cast(value, ir.DoubleType())
+            if value.type != double_:
+                value = self.cast(value, double_)
             return self.builder.call(self.runtime['tostr_double'], [value, self.runtime['GC_malloc_atomic']])
         
         raise CodegenException(ctx.start, f"dont know how to create string from {type2str(value.type)}")
@@ -822,11 +822,11 @@ class Codegen(LangParserVisitor):
         elif name == "ulong":
             return ulong
         elif name == "half":
-            return ir.HalfType()
+            return half_
         elif name == "float":
-            return ir.FloatType()
+            return float_
         elif name == "double":
-            return ir.DoubleType()
+            return double_
         elif name == "void":
             return ir.VoidType()
         elif name == "string":
