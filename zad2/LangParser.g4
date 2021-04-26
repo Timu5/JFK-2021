@@ -11,9 +11,10 @@ fstringElement:
 	| EXPR_ENTER value = expr RPAREN	# exprString;
 
 vtype:
-	ID								# basicType
-	| vtype '*'						# pointerType
-	| vtype '[' (size = INT)? ']'	# arrayType;
+	ID																			# basicType
+	| vtype '*'																	# pointerType
+	| vtype '[' (size = INT)? ']'												# arrayType
+	| 'f' '(' arguments = fnargs (',' varargs = '...')? ')' '->' ret = vtype	# fnType;
 
 args: (expr (COMMA expr)*)?;
 

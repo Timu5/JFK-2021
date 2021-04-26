@@ -98,4 +98,8 @@ def type2str(typ):
     elif isinstance(typ, ir.IdentifiedStructType):
         return typ.name
 
+    elif isinstance(typ, ir.FunctionType):
+        # TODO: var args 
+        return "f(" + ','.join(map(lambda x: type2str(x), typ.args)) + ")->" + type2str(typ.return_type)
+
     return "?"

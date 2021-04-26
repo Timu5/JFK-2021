@@ -380,7 +380,7 @@ class Codegen(LangParserVisitor):
             if not var is None:
                 return var
 
-        raise CodegenException(ctx.start, f"unknown variable {name}")
+        raise CodegenException(ctx.start, f"unknown symbol {name}")
 
     def visitVar(self, ctx: LangParser.VarContext):
         name = ctx.getText()
@@ -389,6 +389,9 @@ class Codegen(LangParserVisitor):
         if var.type.is_pointer:
             if isinstance(var.type.pointee, ir.ArrayType):
                 return var
+
+        if isinstance(var, ir.Function):
+            return var
 
         return self.builder.load(var)
 
@@ -539,38 +542,41 @@ class Codegen(LangParserVisitor):
         return args
 
     def visitCall(self, ctx: LangParser.BinaryContext):
-        # TODO: make this more generic!
-        name = ctx.name.text
+        fn = self.visit(ctx.value)
         args = self.visit(ctx.arguments)
 
-        fn = None
-        if name in self.module.globals:
-            fn = self.module.get_global(name)
+        if not isinstance(fn, ir.Function):
+            if isinstance(fn.type, ir.PointerType) and isinstance(fn.type.pointee, ir.FunctionType):
+                pass
+            else:
+                raise CodegenException(ctx.start, f'"{ctx.value.getText()}" is not a function')
 
-        if fn is None or not isinstance(fn, ir.Function):
-            raise CodegenException(ctx.start, f'cannot find function "{name}"')
+        fn_args = fn.type.pointee.args
+        #fn_ret = fn.type.pointee.return_type
+        fn_var_arg = fn.type.pointee.var_arg
+        #fnargs = fn.ftype.args
 
-        if len(fn.args) != len(args):
-            if not (fn.ftype.var_arg and len(fn.args) < len(args)):
-                raise CodegenException(ctx.start, f"wrong args count, expect {len(fn.args)} got {len(args)}")
+        if len(fn_args) != len(args):
+            if not (fn_var_arg and len(fn_args) < len(args)):
+                raise CodegenException(ctx.start, f"wrong args count, expect {len(fn_args)} got {len(args)}")
 
         irargs = []
         for i, arg in enumerate(args):
             arg_llvm = arg
             if isinstance(arg_llvm.type, StringType):
-                if isinstance(fn.args[i].type, ir.PointerType):
-                    if fn.args[i].type.pointee.width == 8:
+                if isinstance(fn_args[i], ir.PointerType):
+                    if fn_args[i].type.pointee.width == 8:
                         arg_llvm = self.builder.gep(arg_llvm.operands[0], [int_(0),int_(1)])
                         arg_llvm = self.builder.load(arg_llvm)
-                        arg_llvm = self.builder.bitcast(arg_llvm, fn.args[i].type)
+                        arg_llvm = self.builder.bitcast(arg_llvm, fn_args[i])
 
-            if fn.ftype.var_arg and i >= len(fn.args):
+            if fn_var_arg and i >= len(fn_args):
                 # var arg
                 if isinstance(arg_llvm.type, ir.FloatType) or isinstance(arg_llvm.type, ir.HalfType):
-                    arg_llvm = self.builder.fpext(arg_llvm, ir.DoubleType())
+                    arg_llvm = self.builder.fpext(arg_llvm, double_)
             else:
-                if fn.args[i].type != arg_llvm.type:
-                    raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type, expected type {type2str(fn.args[i].type)} got {type2str(arg_llvm.type)}")
+                if fn_args[i] != arg_llvm.type:
+                    raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type, expected type {type2str(fn_args[i])} got {type2str(arg_llvm.type)}")
 
             irargs.append(arg_llvm)
 
@@ -795,6 +801,12 @@ class Codegen(LangParserVisitor):
         if isinstance(typ, ir.VoidType):
             typ = voidptr
         return typ.as_pointer()
+
+    def visitFnType(self, ctx:LangParser.FnTypeContext):
+        args = self.visit(ctx.arguments)
+        rettype = self.visit(ctx.ret)
+        varargs = not ctx.varargs is None
+        return ir.FunctionType(rettype, args, varargs).as_pointer()
 
     def visitArrayType(self, ctx: LangParser.ArrayTypeContext):
         typ = self.visit(ctx.children[0])

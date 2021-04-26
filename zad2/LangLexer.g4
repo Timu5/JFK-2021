@@ -65,6 +65,7 @@ CONTRIUNE: 'continue';
 RETURN: 'return';
 PASS: 'pass';
 FN: 'fn';
+F: 'f';
 STRUCT: 'struct';
 EXTERN: 'extern';
 IF: 'if';
