@@ -27,11 +27,13 @@ class Codegen(LangParserVisitor):
         return self.counter
 
     def gen_ir(self, node):
-        self.module = ir.Module(name="my_super_modul")
+        self.module = ir.Module(name="my_super_modul", context=ir.Context())
         self.module.triple = self.target_machine.triple
         self.module.data_layout = str(self.target_machine.target_data)
         self.runtime = get_runtime_functions(self.module)
         self.visit(node)
+        self.module.templates = self.templates
+        self.module.structs = self.structs
         return self.module
 
     def visitNumber(self, ctx: LangParser.NumberContext):
@@ -991,9 +993,19 @@ class Codegen(LangParserVisitor):
 
         module = self.driver.compile_file("./stdlib/" + name + ".pclang", self.target_machine)
         for f in module.functions:
-            if not f.name in self.module.globals:
+            if f.name in self.module.globals:
+                if not f.name in self.runtime:
+                    raise CodegenException(ctx.start, "symbol redefinition")
+            else:
                 self.module.add_global(f)
-                # TODO: finish me!
+
+        for s in module.structs:
+            members = module.structs[s]
+            b = self.module.context.get_identified_type(s)
+            b.set_body(*[x[1] for x in members])
+            # TODO: check struct redefinition!
+            pass
+        self.templates = self.templates | module.templates
 
     def visitRawArgs(self, ctx: LangParser.RawArgsContext):
         if ctx.children is None:
@@ -1012,7 +1024,6 @@ class Codegen(LangParserVisitor):
         else:
             # TODO: redefinition
             self.templates[ctx.tfunc.name.text] = FunctionTemplate(ctx.tfunc, args)
-
 
     def visitStructValTemplate(self, ctx: LangParser.StructValTemplateContext):
         pass
