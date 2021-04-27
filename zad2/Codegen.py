@@ -609,19 +609,24 @@ class Codegen(LangParserVisitor):
                             i += 1
                 # generate fn or get ready one
                 template = fn
-                oldtypes = self.types
-                oldlocals = self.locals
-                oldbuilder = self.builder
-                oldname = template.body.name.text
+                signature = '|'.join(map(lambda x: type2str(x), types.values()))
+                if signature in template.implemented:
+                    fn = template.implemented[signature]
+                else:
+                    oldtypes = self.types
+                    oldlocals = self.locals
+                    oldbuilder = self.builder
+                    oldname = template.body.name.text
 
-                self.types = types
-                template.body.name.text += str(self.get_uniq())
-                fn = self.visit(template.body)
+                    self.types = types
+                    template.body.name.text += str(self.get_uniq())
+                    fn = self.visit(template.body)
 
-                template.body.name.text = oldname
-                self.types = oldtypes
-                self.builder = oldbuilder
-                self.locals = oldlocals
+                    template.body.name.text = oldname
+                    template.implemented[signature] = fn
+                    self.types = oldtypes
+                    self.builder = oldbuilder
+                    self.locals = oldlocals
             elif isinstance(fn.type, ir.PointerType) and isinstance(fn.type.pointee, ir.FunctionType):
                 pass
             else:
@@ -1045,23 +1050,28 @@ class Codegen(LangParserVisitor):
         oldbuilder = self.builder
 
         self.types = {}
+        fn = None
         
         for i in range(len(types)):
             self.types[template.types[i]] = types[i]
 
-        oldname = template.body.name.text
+        signature = '|'.join(map(lambda x: type2str(x), self.types.values()))
+        if signature in template.implemented:
+            fn =template.implemented[signature]
+        else:
+            oldname = template.body.name.text
 
-        template.body.name.text += str(self.get_uniq())
+            template.body.name.text += str(self.get_uniq())
 
-        fn = self.visit(template.body)
+            fn = self.visit(template.body)
 
-        template.body.name.text = oldname
+            template.body.name.text = oldname
 
-        self.types = oldtypes
-        self.builder = oldbuilder
-        self.locals = oldlocals
+            self.types = oldtypes
+            self.builder = oldbuilder
+            self.locals = oldlocals
 
-        # TODO: check types
+            # TODO: check types
 
         return self.builder.call(fn, args)
 

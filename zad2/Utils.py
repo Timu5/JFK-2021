@@ -48,7 +48,7 @@ class FunctionTemplate:
     def __init__(self, body, types):
         self.body = body
         self.types = types
-        self.implemented = []
+        self.implemented = {}
 
 def isNumber(x):
     if isinstance(x.type, ir.IntType) or isinstance(x.type, ir.types._BaseFloatType):
