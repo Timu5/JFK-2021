@@ -138,7 +138,7 @@ class Codegen(LangParserVisitor):
         return self.builder.load(newptr)
 
     def visitRawString(self, ctx:LangParser.RawStringContext):
-        text = text = ctx.getText().encode('utf-8').decode('unicode_escape');
+        text = ctx.getText().encode('utf-8').decode('unicode_escape')
         return self.createString(text)
 
     def visitExprString(self, ctx:LangParser.ExprStringContext):
@@ -253,7 +253,6 @@ class Codegen(LangParserVisitor):
 
         return value
 
-
     def visitCast(self, ctx: LangParser.CastContext):
         vartype = self.visit(ctx.vartype)
         value = self.visit(ctx.value)
@@ -296,6 +295,9 @@ class Codegen(LangParserVisitor):
     def visitUnary(self, ctx: LangParser.UnaryContext):
         op = ctx.op
         primary = self.visit(ctx.primary)
+
+        if isinstance(primary, ir.Constant):
+            pass
 
         if op == LangLexer.NOT:
             primary = self.convert_to_i1(ctx, primary)
@@ -616,6 +618,8 @@ class Codegen(LangParserVisitor):
                                 if types[name] != argtype:
                                     raise CodegenException(ctx.start, f'type "{name}" redefintion')
                             types[name] = argtype
+                            if isinstance(argtype, ir.VoidType):
+                                raise CodegenException(ctx.arguments.children[i].start, "cannot instantiate template with void type")
                             i += 1
                 # generate fn or get ready one
                 template = fn
@@ -630,6 +634,7 @@ class Codegen(LangParserVisitor):
 
                     self.types = types
                     template.body.name.text += str(self.get_uniq())
+                    template.body.name.text = "__" + template.body.name.text
                     fn = self.visit(template.body)
 
                     template.body.name.text = oldname
@@ -647,9 +652,7 @@ class Codegen(LangParserVisitor):
                 raise CodegenException(ctx.start, f'"{ctx.value.getText()}" is not a function')
 
         fn_args = fn.type.pointee.args
-        #fn_ret = fn.type.pointee.return_type
         fn_var_arg = fn.type.pointee.var_arg
-        #fnargs = fn.ftype.args
 
         if len(fn_args) != len(args):
             if not (fn_var_arg and len(fn_args) < len(args)):
@@ -1157,6 +1160,8 @@ class Codegen(LangParserVisitor):
             oldname = template.body.name.text
 
             template.body.name.text += str(self.get_uniq())
+
+            template.body.name.text = "__" + template.body.name.text
 
             fn = self.visit(template.body)
 

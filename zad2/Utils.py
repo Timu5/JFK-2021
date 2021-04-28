@@ -102,7 +102,7 @@ def type2str(typ):
     elif typ == double_:
         return "double"
     elif typ == ir.VoidType():
-        return "void";
+        return "void"
 
     elif isinstance(typ, StringType):
         return "string"
