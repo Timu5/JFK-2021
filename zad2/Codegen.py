@@ -21,6 +21,7 @@ class Codegen(LangParserVisitor):
         self.templates = {}
         self.loops = []
         self.types = {}
+        self.instruct = False
 
     def get_uniq(self):
         self.counter += 1
@@ -403,8 +404,11 @@ class Codegen(LangParserVisitor):
         struct_name = primary.type.name
         struct = self.structs[struct_name]
         try:
-            idx = next(i for i, v in enumerate(struct)
-                       if (lambda x: x[0] == name)(v))
+            if name in struct.indexes:
+                idx = struct.indexes[name]
+            elif name in struct.members:
+                idx = None
+                return StructMethod(primary, struct.members[name])
         except Exception:
             raise CodegenException(
                 ctx.start, f'cannot find member "{name}" of struct "{struct_name}"')
@@ -633,6 +637,10 @@ class Codegen(LangParserVisitor):
                     self.types = oldtypes
                     self.builder = oldbuilder
                     self.locals = oldlocals
+            elif isinstance(fn, StructMethod):
+                args.insert(0, fn.obj)
+                fn = fn.fn
+                pass
             elif isinstance(fn.type, ir.PointerType) and isinstance(fn.type.pointee, ir.FunctionType):
                 pass
             else:
@@ -974,10 +982,13 @@ class Codegen(LangParserVisitor):
         fn_ty = ir.FunctionType(retval, args, var_arg=varargs)
         ir.Function(self.module, fn_ty, name=name)
 
-    def visitStructMember(self, ctx: LangParser.StructMemberContext):
+    def visitStructField(self, ctx: LangParser.StructFieldContext):
         vtype = self.visit(ctx.membertype)
         name = ctx.name.text
-        return name, vtype
+        return {'name':name, 'type': vtype, 'fn':None}
+
+    def visitStructMethod(self, ctx: LangParser.StructMethodContext):
+        return {'name': ctx.func.name.text, 'fn': ctx.func}
 
     def visitStructMembers(self, ctx: LangParser.StructMembersContext):
         if ctx.children is None:
@@ -988,16 +999,93 @@ class Codegen(LangParserVisitor):
                 members.append(self.visit(member))
         return members
 
+    def visitFunctionEmpty(self, ctx: LangParser.FunctionContext):
+        retval = self.visit(ctx.rettype)
+        name = ctx.name.text
+        args, args_names = self.visit(ctx.arguments)
+        varargs = not ctx.varargs is None
+        if not self.instruct is None:
+            args.insert(0, self.module.context.get_identified_type(self.instruct.name))
+            args_names.insert(0, "this")
+        fn_ty = ir.FunctionType(retval, args, var_arg=varargs)
+        func = ir.Function(self.module, fn_ty, name=name)
+        return func
+
+    def visitFunctionBody(self, ctx: LangParser.FunctionContext, func):
+        name = ctx.name.text
+        args, args_names = self.visit(ctx.arguments)
+        if not self.instruct is None:
+            args.insert(0, self.module.context.get_identified_type(self.instruct.name))
+            args_names.insert(0, "this")
+
+        block = func.append_basic_block(name="entry")
+        self.builder = ir.IRBuilder(block)
+
+        self.locals = {}
+
+        for index, value in enumerate(func.args):
+            atype = args[index]
+            aname = args_names[index]
+            ptr = self.builder.alloca(atype)
+            self.locals[aname] = ptr
+            self.builder.store(value, ptr)
+
+        self.visit(ctx.block)
+
+        if len(self.builder.block.instructions) == 0 or not isinstance(self.builder.block.instructions[-1], ir.Ret):
+            if isinstance(func.ftype.return_type, ir.VoidType):
+                self.builder.ret_void()
+            else:
+                raise CodegenException(ctx.start, f'missing return in "{name}" function')
+
+        self.locals = None
+        self.builder = None
+
+        return func
+
     def visitStruct(self, ctx: LangParser.StructContext):
         name = ctx.name.text
         members = self.visit(ctx.members)
 
+        fields = []
+        indexes = {}
+        methods = {}
+
+        result = {}
+
+        for m in members:
+            if not m['fn'] is None:
+                methods[m['name']] = m['fn']
+                result[m['name']] = m['fn']
+            else:
+                fields.append(m['type'])
+                indexes[m['name']] = len(fields) - 1
+                result[m['name']] = m['type']
+
         if name in self.structs:
             raise CodegenException(ctx.start, f'struct "{name}" redefinition')
 
-        self.structs[name] = members
         b = self.module.context.get_identified_type(name)
-        b.set_body(*[x[1] for x in members])
+        b.set_body(*fields)
+
+        self.structs[name] = StructType(name, result, indexes)
+
+        functions = {}
+
+        for m in methods:
+            self.instruct = self.structs[name]
+            fn = self.visitFunctionEmpty(methods[m])
+            fn.name = "__" + name + "_" + fn.name
+            functions[m] = fn
+            result[m] = fn
+            self.instruct = None
+
+        self.structs[name] = StructType(name, result, indexes)
+
+        for m in methods:
+            self.instruct = self.structs[name]
+            fn = self.visitFunctionBody(methods[m], functions[m])
+            self.instruct = None
 
     def visitImportLib(self, ctx:LangParser.ImportLibContext):
         name = ctx.name.text
@@ -1013,8 +1101,9 @@ class Codegen(LangParserVisitor):
         for s in module.structs:
             members = module.structs[s]
             b = self.module.context.get_identified_type(s)
-            b.set_body(*[x[1] for x in members])
+            b.set_body(*members.fields)
             # TODO: check struct redefinition!
+            self.structs[s] = members
             pass
         self.templates = self.templates | module.templates
 

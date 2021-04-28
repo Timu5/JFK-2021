@@ -44,6 +44,17 @@ class StringType(ir.LiteralStructType):
         super().__init__([ulong, ir.ArrayType(ubyte, 1).as_pointer()])
         self.element = ubyte
 
+class StructType:
+    def __init__(self, name, members, indexes):
+        self.name = name
+        self.members = members
+        self.indexes = indexes
+
+class StructMethod:
+    def __init__(self, obj, fn):
+        self.obj = obj
+        self.fn = fn
+
 class FunctionTemplate:
     def __init__(self, body, types):
         self.body = body

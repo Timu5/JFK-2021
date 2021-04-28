@@ -84,8 +84,10 @@ extern:
 		COMMA varargs = '...'
 	)? RPAREN '->' rettype = vtype NL;
 
-structMember: name = ID ':' membertype = vtype;
-structMembers: (structMember NL)+;
+structMember:
+	name = ID ':' membertype = vtype NL	# structField
+	| func = function					# structMethod;
+structMembers: (structMember)+;
 struct:
 	'struct' name = ID ':' INDENT members = structMembers DEDENT;
 
