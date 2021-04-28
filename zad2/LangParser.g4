@@ -27,17 +27,10 @@ primary:
 	| ID																	# var
 	| '[' args ']'															# array
 	| name = ID '(' types = fnargs ')' '{' arguments = args '}'			# structValTemplate
-	| name = ID '{' args '}'												# structVal
-	| 'cast' '(' vartype = vtype ')' value = primary						# cast
+	| 'cast' '(' vartype = vtype ')' value = primary					# cast
+	| 'typeid' '(' vartype = vtype ')'									# typeid
 	| value = primary '(' types = fnargs ')' '(' arguments = args ')'	# callTemplate
-	| value = primary '(' arguments = args ')'								# call
-	| LPAREN expr RPAREN													# parenthesis
-	| primary '.' ID														# member
-	| primary '[' expr ']'													# index
-	| '&' value = primary													# address
-	| '*' value = primary													# deref
-	| op = ('++' | '--') value = primary									# pre
-	| value = primary op = ('++' | '--')									# post;
+	| value = primary '(' arguments = args ')'							# call
 
 expr:
 	left = expr op = (MULT | DIV) right = expr							# binary

@@ -59,6 +59,7 @@ GEQUAL: '>=';
 ARROW: '->';
 NOT: 'not';
 CAST: 'cast';
+TYPEID: 'typeid';
 AND: 'and';
 OR: 'or';
 CONST: 'const';

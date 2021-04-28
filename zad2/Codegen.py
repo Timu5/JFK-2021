@@ -378,6 +378,8 @@ class Codegen(LangParserVisitor):
             return ir.Constant(ulong, primary.type.get_abi_size(self.target_machine.target_data))
         elif name == 'str':
             return self.toStr(ctx, primary)
+        elif name == 'typeid':
+            return ulong(hash(type2str(primary.type)))
         elif isinstance(primary.type, SizedArrayType) or isinstance(primary.type, StringType):
             if not isinstance(primary, ir.LoadInstr):
                 raise CodegenException(
@@ -414,6 +416,10 @@ class Codegen(LangParserVisitor):
         ptr = self.builder.gep(primary, [ir.Constant(
             int_, 0), int_(idx)])
         return self.builder.load(ptr)
+
+    def visitTypeid(self, ctx: LangParser.TypeidContext):
+        vartype = self.visit(ctx.vartype)
+        return ulong(hash(type2str(vartype)))
 
     def getVar(self, name, ctx):
         if name in self.locals:
