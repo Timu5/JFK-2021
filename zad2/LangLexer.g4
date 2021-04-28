@@ -70,6 +70,7 @@ PASS: 'pass';
 FN: 'fn';
 F: 'f';
 STRUCT: 'struct';
+CLASS: 'class';
 EXTERN: 'extern';
 IF: 'if';
 ELSE: 'else';

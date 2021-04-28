@@ -89,7 +89,7 @@ structMember:
 	| func = function					# structMethod;
 structMembers: (structMember)+;
 struct:
-	'struct' name = ID ':' INDENT members = structMembers DEDENT;
+	('struct'|'class') name = ID ':' INDENT members = structMembers DEDENT;
 
 importLib: IMPORT name = ID NL;
 

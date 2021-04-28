@@ -403,13 +403,22 @@ class Codegen(LangParserVisitor):
             else:
                 raise CodegenException(ctx.start, 'arrays have only "length" and "ptr" properties')
 
-        struct_name = primary.type.name
+        struct_name = None
+        if isinstance(primary.type, ir.PointerType):
+            struct_name = primary.type.pointee.name
+        else:
+            struct_name = primary.type.name
         struct = self.structs[struct_name]
+        if not isinstance(primary, ir.LoadInstr):
+            raise CodegenException(ctx.start, "hle2?")
+        oldprim = primary
         try:
             if name in struct.indexes:
                 idx = struct.indexes[name]
             elif name in struct.members:
                 idx = None
+                if struct.isclass:
+                    return StructMethod(primary.operands[0], struct.members[name])
                 return StructMethod(primary, struct.members[name])
         except Exception:
             raise CodegenException(
@@ -418,9 +427,10 @@ class Codegen(LangParserVisitor):
         if isinstance(primary, ir.LoadInstr):
             primary = primary.operands[0]
             self.builder.block.instructions.pop()
+        if isinstance(oldprim.type, ir.PointerType):
+            primary = self.builder.load(primary)
 
-        ptr = self.builder.gep(primary, [ir.Constant(
-            int_, 0), int_(idx)])
+        ptr = self.builder.gep(primary, [int_(0), int_(idx)])
         return self.builder.load(ptr)
 
     def visitTypeid(self, ctx: LangParser.TypeidContext):
@@ -462,6 +472,10 @@ class Codegen(LangParserVisitor):
 
         if not name in self.structs:
             raise CodegenException(ctx.start, f'no struct with name "{name}"')
+
+        if self.structs[name].isclass:
+            # TODO: allocate memory
+            pass
 
         vtype = self.module.context.get_identified_type(name)
 
@@ -674,7 +688,9 @@ class Codegen(LangParserVisitor):
                     arg_llvm = self.builder.fpext(arg_llvm, double_)
             else:
                 if fn_args[i] != arg_llvm.type:
-                    raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type, expected type {type2str(fn_args[i])} got {type2str(arg_llvm.type)}")
+                    # TODO: fix me
+                    #raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type, expected type {type2str(fn_args[i])} got {type2str(arg_llvm.type)}")
+                    raise CodegenException(ctx.start, f"argument {i+1} have wrong type, expected type {type2str(fn_args[i])} got {type2str(arg_llvm.type)}")
 
             irargs.append(arg_llvm)
 
@@ -1008,8 +1024,11 @@ class Codegen(LangParserVisitor):
         args, args_names = self.visit(ctx.arguments)
         varargs = not ctx.varargs is None
         if not self.instruct is None:
-            args.insert(0, self.module.context.get_identified_type(self.instruct.name))
-            args_names.insert(0, "this")
+            typ = self.module.context.get_identified_type(self.instruct.name)
+            if self.instruct.isclass:
+                args.insert(0, typ.as_pointer())
+            else:
+                args.insert(0, typ)
         fn_ty = ir.FunctionType(retval, args, var_arg=varargs)
         func = ir.Function(self.module, fn_ty, name=name)
         return func
@@ -1018,7 +1037,11 @@ class Codegen(LangParserVisitor):
         name = ctx.name.text
         args, args_names = self.visit(ctx.arguments)
         if not self.instruct is None:
-            args.insert(0, self.module.context.get_identified_type(self.instruct.name))
+            typ = self.module.context.get_identified_type(self.instruct.name)
+            if self.instruct.isclass:
+                args.insert(0, typ.as_pointer())
+            else:
+                args.insert(0, typ)
             args_names.insert(0, "this")
 
         block = func.append_basic_block(name="entry")
@@ -1047,6 +1070,7 @@ class Codegen(LangParserVisitor):
         return func
 
     def visitStruct(self, ctx: LangParser.StructContext):
+        class_ = ctx.children[0].symbol.text == 'class'
         name = ctx.name.text
         members = self.visit(ctx.members)
 
@@ -1071,7 +1095,7 @@ class Codegen(LangParserVisitor):
         b = self.module.context.get_identified_type(name)
         b.set_body(*fields)
 
-        self.structs[name] = StructType(name, result, indexes)
+        self.structs[name] = StructType(name, result, indexes, isclass=class_)
 
         functions = {}
 
@@ -1083,7 +1107,7 @@ class Codegen(LangParserVisitor):
             result[m] = fn
             self.instruct = None
 
-        self.structs[name] = StructType(name, result, indexes)
+        self.structs[name] = StructType(name, result, indexes, isclass=class_)
 
         for m in methods:
             self.instruct = self.structs[name]
@@ -1108,7 +1132,8 @@ class Codegen(LangParserVisitor):
             # TODO: check struct redefinition!
             self.structs[s] = members
             pass
-        self.templates = self.templates | module.templates
+        #self.templates = self.templates | module.templates # only python 3.9
+        self.templates = {**self.templates, **module.templates}
 
     def visitRawArgs(self, ctx: LangParser.RawArgsContext):
         if ctx.children is None:
