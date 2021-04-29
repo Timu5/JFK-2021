@@ -79,7 +79,7 @@ FOR: 'for';
 IMPORT: 'import';
 TEMPLATE: 'template';
 SLASH: '\\';
-ID: [_a-zA-Z]([0-9a-zA-Z][0-9a-zA-Z]*)?;
+ID: [_a-zA-Z][_0-9a-zA-Z]*;
 
 OPEN_STRING: '"' -> pushMode(IN_STRING);
 

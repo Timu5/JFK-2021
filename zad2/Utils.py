@@ -45,11 +45,12 @@ class StringType(ir.LiteralStructType):
         self.element = ubyte
 
 class StructType:
-    def __init__(self, name, members, indexes, isclass=False):
+    def __init__(self, name, members, indexes, fields, isclass=False):
         self.name = name
         self.members = members
         self.indexes = indexes
         self.isclass = isclass
+        self.fields = fields
 
 class StructMethod:
     def __init__(self, obj, fn):

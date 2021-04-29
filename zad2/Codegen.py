@@ -645,25 +645,7 @@ class Codegen(LangParserVisitor):
                             i += 1
                 # generate fn or get ready one
                 template = fn
-                signature = '|'.join(map(lambda x: type2str(x), types.values()))
-                if signature in template.implemented:
-                    fn = template.implemented[signature]
-                else:
-                    oldtypes = self.types
-                    oldlocals = self.locals
-                    oldbuilder = self.builder
-                    oldname = template.body.name.text
-
-                    self.types = types
-                    template.body.name.text += str(self.get_uniq())
-                    template.body.name.text = "$" + template.body.name.text
-                    fn = self.visit(template.body)
-
-                    template.body.name.text = oldname
-                    template.implemented[signature] = fn
-                    self.types = oldtypes
-                    self.builder = oldbuilder
-                    self.locals = oldlocals
+                fn = self.getTemplateInstance(template, types)
             elif isinstance(fn, StructMethod):
                 args.insert(0, fn.obj)
                 fn = fn.fn
@@ -705,7 +687,6 @@ class Codegen(LangParserVisitor):
         return self.builder.call(fn, irargs)
 
     def visitTenary(self, ctx: LangParser.TenaryContext):
-        # cond, truee, falsee
         cond = self.visit(ctx.cond)
         lhs = self.visit(ctx.truee)
         rhs = self.visit(ctx.falsee)
@@ -1106,7 +1087,7 @@ class Codegen(LangParserVisitor):
         b = self.module.context.get_identified_type(name)
         b.set_body(*fields)
 
-        self.structs[name] = StructType(name, result, indexes, isclass=class_)
+        self.structs[name] = StructType(name, result, indexes, fields, isclass=class_)
 
         functions = {}
 
@@ -1120,7 +1101,7 @@ class Codegen(LangParserVisitor):
             result[m] = fn
             self.instruct = None
 
-        self.structs[name] = StructType(name, result, indexes, isclass=class_)
+        self.structs[name] = StructType(name, result, indexes, fields, isclass=class_)
 
         for m in methods:
             self.instruct = self.structs[name]
@@ -1168,6 +1149,35 @@ class Codegen(LangParserVisitor):
             # TODO: redefinition
             self.templates[ctx.tfunc.name.text] = FunctionTemplate(ctx.tfunc, args)
 
+    def getTemplateInstance(self, template, types):
+        signature = '|'.join(map(lambda x: type2str(x), types.values()))
+        if signature in template.implemented:
+            return template.implemented[signature]
+        else:
+            oldtypes = self.types
+            oldlocals = self.locals
+            oldbuilder = self.builder
+
+            self.types = types
+
+            oldname = template.body.name.text
+
+            idd = self.get_uniq()
+
+            template.body.name.text = "$" + template.body.name.text + str(idd)
+
+            res = self.visit(template.body)
+
+            template.body.name.text = oldname
+
+            self.types = oldtypes
+            self.builder = oldbuilder
+            self.locals = oldlocals
+            template.implemented[signature] = res
+            
+            # TODO: check types
+            return res
+
     def visitStructValTemplate(self, ctx: LangParser.StructValTemplateContext):
         name = ctx.name.text
         types = self.visit(ctx.types)
@@ -1178,38 +1188,12 @@ class Codegen(LangParserVisitor):
         if len(types) != len(template.types):
             raise CodegenException(ctx.start, "ehh not working :(")
 
-        # set types somehow
-        oldtypes = self.types
-        oldlocals = self.locals
-        oldbuilder = self.builder
-
-        self.types = {}
-        st = None
+        self_types = {}
         
         for i in range(len(types)):
-            self.types[template.types[i]] = types[i]
+            self_types[template.types[i]] = types[i]
 
-        signature = '|'.join(map(lambda x: type2str(x), self.types.values()))
-        if signature in template.implemented:
-            st = template.implemented[signature]
-        else:
-            oldname = template.body.name.text
-
-            template.body.name.text += str(self.get_uniq())
-
-            template.body.name.text = "$" + template.body.name.text
-
-            st = self.visit(template.body)
-
-            template.body.name.text = oldname
-
-            self.types = oldtypes
-            self.builder = oldbuilder
-            self.locals = oldlocals
-            # TODO: check types
-            template.implemented[signature] = st
-        
-        name = st
+        name = self.getTemplateInstance(template, self_types)
 
         if not name in self.structs:
             raise CodegenException(ctx.start, f'no struct with name "{name}"')
@@ -1243,37 +1227,12 @@ class Codegen(LangParserVisitor):
         if len(types) != len(template.types):
             raise CodegenException(ctx.start, "ehh not working :(")
 
-        # set types somehow
-
-        oldtypes = self.types
-        oldlocals = self.locals
-        oldbuilder = self.builder
-
-        self.types = {}
-        fn = None
+        self_types = {}
         
         for i in range(len(types)):
-            self.types[template.types[i]] = types[i]
+            self_types[template.types[i]] = types[i]
 
-        signature = '|'.join(map(lambda x: type2str(x), self.types.values()))
-        if signature in template.implemented:
-            fn =template.implemented[signature]
-        else:
-            oldname = template.body.name.text
-
-            template.body.name.text += str(self.get_uniq())
-
-            template.body.name.text = "__" + template.body.name.text
-
-            fn = self.visit(template.body)
-
-            template.body.name.text = oldname
-
-            self.types = oldtypes
-            self.builder = oldbuilder
-            self.locals = oldlocals
-
-            # TODO: check types
+        fn = self.getTemplateInstance(template, self_types)
 
         return self.builder.call(fn, args)
 
