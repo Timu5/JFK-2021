@@ -370,6 +370,14 @@ class Codegen(LangParserVisitor):
             if value.type != double_:
                 value = self.cast(value, double_)
             return self.builder.call(self.runtime['tostr_double'], [value, self.runtime['GC_malloc_atomic']])
+        elif isinstance(value.type, ir.IdentifiedStructType):
+            st_name = value.type.name
+            st = self.structs[st_name]
+            if "str" in st.members:
+                fn = st.members["str"]
+                if st.isclass:
+                    value = value.operands[0]
+                return self.builder.call(fn, [value])
         
         raise CodegenException(ctx.start, f"dont know how to create string from {type2str(value.type)}")
 
@@ -648,7 +656,7 @@ class Codegen(LangParserVisitor):
 
                     self.types = types
                     template.body.name.text += str(self.get_uniq())
-                    template.body.name.text = "__" + template.body.name.text
+                    template.body.name.text = "$" + template.body.name.text
                     fn = self.visit(template.body)
 
                     template.body.name.text = oldname
@@ -932,6 +940,9 @@ class Codegen(LangParserVisitor):
         #elements = int(ctx.size.text)
         #return ir.ArrayType(typ, elements)
 
+    def visitTemplateType(self, ctx:LangParser.TemplateTypeContext):
+        raise CodegenException(ctx.start, "not implemented")
+
     def visitFnargs(self, ctx: LangParser.FnargsContext):
         if ctx.children is None:
             return []
@@ -1101,8 +1112,10 @@ class Codegen(LangParserVisitor):
 
         for m in methods:
             self.instruct = self.structs[name]
+            oldname = methods[m].name.text
+            methods[m].name.text = "$" + name + "_" + methods[m].name.text
             fn = self.visitFunctionEmpty(methods[m])
-            fn.name = "__" + name + "_" + fn.name
+            methods[m].name.text = oldname
             functions[m] = fn
             result[m] = fn
             self.instruct = None
@@ -1113,6 +1126,8 @@ class Codegen(LangParserVisitor):
             self.instruct = self.structs[name]
             fn = self.visitFunctionBody(methods[m], functions[m])
             self.instruct = None
+
+        return name
 
     def visitImportLib(self, ctx:LangParser.ImportLibContext):
         name = ctx.name.text
@@ -1148,13 +1163,75 @@ class Codegen(LangParserVisitor):
         args = self.visit(ctx.arguments)
 
         if not ctx.tstruct is None:
-            raise CodegenException(ctx.start, "struct template not implemented")
+            self.templates[ctx.tstruct.name.text] = StructTemplate(ctx.tstruct, args)
         else:
             # TODO: redefinition
             self.templates[ctx.tfunc.name.text] = FunctionTemplate(ctx.tfunc, args)
 
     def visitStructValTemplate(self, ctx: LangParser.StructValTemplateContext):
-        pass
+        name = ctx.name.text
+        types = self.visit(ctx.types)
+        args = self.visit(ctx.arguments)
+
+        template = self.templates[name]
+
+        if len(types) != len(template.types):
+            raise CodegenException(ctx.start, "ehh not working :(")
+
+        # set types somehow
+        oldtypes = self.types
+        oldlocals = self.locals
+        oldbuilder = self.builder
+
+        self.types = {}
+        st = None
+        
+        for i in range(len(types)):
+            self.types[template.types[i]] = types[i]
+
+        signature = '|'.join(map(lambda x: type2str(x), self.types.values()))
+        if signature in template.implemented:
+            st = template.implemented[signature]
+        else:
+            oldname = template.body.name.text
+
+            template.body.name.text += str(self.get_uniq())
+
+            template.body.name.text = "$" + template.body.name.text
+
+            st = self.visit(template.body)
+
+            template.body.name.text = oldname
+
+            self.types = oldtypes
+            self.builder = oldbuilder
+            self.locals = oldlocals
+            # TODO: check types
+            template.implemented[signature] = st
+        
+        name = st
+
+        if not name in self.structs:
+            raise CodegenException(ctx.start, f'no struct with name "{name}"')
+
+        if self.structs[name].isclass:
+            # TODO: allocate memory
+            pass
+
+        vtype = self.module.context.get_identified_type(name)
+
+        args = self.visit(ctx.arguments)
+        if len(args) == 0:
+            raise CodegenException(ctx.start, "cannot create empty struct")
+        if any([not isinstance(a, ir.Constant) for a in args]):
+            raise CodegenException(
+                ctx.start, "struct must be built from consts elements")
+
+        if any([not a.type == b for a, b in zip(args, vtype.elements)]):
+            raise CodegenException(ctx.start, "types mismatch")
+
+        struct = ir.Constant(vtype, [x.constant for x in args])
+        return struct
 
     def visitCallTemplate(self, ctx: LangParser.CallTemplateContext):
         name = ctx.value.getText()

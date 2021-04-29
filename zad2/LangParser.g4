@@ -14,7 +14,7 @@ vtype:
 	ID																			# basicType
 	| vtype '*'																	# pointerType
 	| vtype '[' (size = INT)? ']'												# arrayType
-	| 'f' '(' arguments = fnargs (',' varargs = '...')? ')' '->' ret = vtype	# fnType;
+	| ID '(' arguments = fnargs ')'												# templateType;
 
 args: (expr (COMMA expr)*)?;
 
@@ -89,7 +89,7 @@ structMember:
 	| func = function					# structMethod;
 structMembers: (structMember)+;
 struct:
-	('struct'|'class') name = ID ':' INDENT members = structMembers DEDENT;
+	('struct' | 'class') name = ID ':' INDENT members = structMembers DEDENT;
 
 importLib: IMPORT name = ID NL;
 

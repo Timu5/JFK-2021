@@ -62,6 +62,12 @@ class FunctionTemplate:
         self.types = types
         self.implemented = {}
 
+class StructTemplate:
+    def __init__(self, body, types):
+        self.body = body
+        self.types = types
+        self.implemented = {}
+
 def isNumber(x):
     if isinstance(x.type, ir.IntType) or isinstance(x.type, ir.types._BaseFloatType):
         return True
