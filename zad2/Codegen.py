@@ -370,13 +370,15 @@ class Codegen(LangParserVisitor):
             if value.type != double_:
                 value = self.cast(value, double_)
             return self.builder.call(self.runtime['tostr_double'], [value, self.runtime['GC_malloc_atomic']])
-        elif isinstance(value.type, ir.IdentifiedStructType):
-            st_name = value.type.name
+        elif isClassOrStruct(value):
+            st_name = None
+            if value.type.is_pointer:
+                st_name = value.type.pointee.name
+            else:
+                st_name = value.type.name
             st = self.structs[st_name]
             if "str" in st.members:
                 fn = st.members["str"]
-                if st.isclass:
-                    value = value.operands[0]
                 return self.builder.call(fn, [value])
         
         raise CodegenException(ctx.start, f"dont know how to create string from {type2str(value.type)}")
@@ -481,10 +483,6 @@ class Codegen(LangParserVisitor):
         if not name in self.structs:
             raise CodegenException(ctx.start, f'no struct with name "{name}"')
 
-        if self.structs[name].isclass:
-            # TODO: allocate memory
-            pass
-
         vtype = self.module.context.get_identified_type(name)
 
         args = self.visit(ctx.children[2])
@@ -497,8 +495,18 @@ class Codegen(LangParserVisitor):
         if any([not a.type == b for a, b in zip(args, vtype.elements)]):
             raise CodegenException(ctx.start, "types mismatch")
 
-        struct = ir.Constant(vtype, [x.constant for x in args])
-        return struct
+        result = ir.Constant(vtype, [x.constant for x in args])
+
+        if self.structs[name].isclass:
+            ltype = ir.LiteralStructType(vtype.elements)
+            size =  ltype.get_abi_size(self.target_machine.target_data)
+            ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
+            ptr = self.builder.bitcast(ptr, vtype.as_pointer())
+            self.builder.store(result, ptr)
+            ptr.type.isclass = True
+            result = ptr
+
+        return result
 
     def visitAndOr(self, ctx: LangParser.AndOrContext):
         op = ctx.op.text
@@ -812,9 +820,6 @@ class Codegen(LangParserVisitor):
 
         elif ctx.vartype is None and not ctx.value is None:
             value = self.visit(ctx.value)
-            if value.type.is_pointer:
-                self.locals[ctx.name.text] = value
-                return
             ptr = self.builder.alloca(value.type)
             self.builder.store(value, ptr)
             self.locals[ctx.name.text] = ptr
@@ -1198,13 +1203,8 @@ class Codegen(LangParserVisitor):
         if not name in self.structs:
             raise CodegenException(ctx.start, f'no struct with name "{name}"')
 
-        if self.structs[name].isclass:
-            # TODO: allocate memory
-            pass
-
         vtype = self.module.context.get_identified_type(name)
 
-        args = self.visit(ctx.arguments)
         if len(args) == 0:
             raise CodegenException(ctx.start, "cannot create empty struct")
         if any([not isinstance(a, ir.Constant) for a in args]):
@@ -1212,10 +1212,19 @@ class Codegen(LangParserVisitor):
                 ctx.start, "struct must be built from consts elements")
 
         if any([not a.type == b for a, b in zip(args, vtype.elements)]):
-            raise CodegenException(ctx.start, "types mismatch")
+            raise CodegenException(ctx.start, "types mismatch" + str(vtype.elements))
 
-        struct = ir.Constant(vtype, [x.constant for x in args])
-        return struct
+        result = ir.Constant(vtype, [x.constant for x in args])
+
+        if self.structs[name].isclass:
+            ltype = ir.LiteralStructType(vtype.elements)
+            size = ltype.get_abi_size(self.target_machine.target_data)
+            ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
+            ptr = self.builder.bitcast(ptr, vtype.as_pointer())
+            self.builder.store(result, ptr)
+            result = ptr
+
+        return result
 
     def visitCallTemplate(self, ctx: LangParser.CallTemplateContext):
         name = ctx.value.getText()
@@ -1228,7 +1237,6 @@ class Codegen(LangParserVisitor):
             raise CodegenException(ctx.start, "ehh not working :(")
 
         self_types = {}
-        
         for i in range(len(types)):
             self_types[template.types[i]] = types[i]
 

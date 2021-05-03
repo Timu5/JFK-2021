@@ -86,6 +86,23 @@ def isSigned(x):
         return True
     return False
 
+def isClass(x):
+    if x.type.is_pointer and isinstance(x.type.pointee, ir.IdentifiedStructType):
+        return True
+    return False
+
+def isStruct(x):
+    if isinstance(x.type, ir.IdentifiedStructType):
+        return True
+    return False
+
+def isClassOrStruct(x):
+    if isStruct(x):
+        return True
+    if isClass(x):
+        return True
+    return False
+
 def type2str(typ):
     if typ == int_:
         return "int"
@@ -119,6 +136,9 @@ def type2str(typ):
         return type2str(typ.element) + "[]"
 
     elif isinstance(typ, ir.PointerType):
+        if isinstance(typ.pointee, ir.IdentifiedStructType):
+            # TODO: check if this is a class or not!
+            return typ.name
         return type2str(typ.pointee) + "*"
 
     elif isinstance(typ, ir.IdentifiedStructType):
@@ -127,5 +147,7 @@ def type2str(typ):
     elif isinstance(typ, ir.FunctionType):
         # TODO: var args 
         return "f(" + ','.join(map(lambda x: type2str(x), typ.args)) + ")->" + type2str(typ.return_type)
+
+    # TODO: Add templates!
 
     return "?"
