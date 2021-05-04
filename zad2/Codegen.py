@@ -1172,9 +1172,11 @@ class Codegen(LangParserVisitor):
         args = self.visit(ctx.arguments)
 
         if not ctx.tstruct is None:
+            ctx.tstruct.filename = self.driver.files[-1]
             self.templates[ctx.tstruct.name.text] = StructTemplate(ctx.tstruct, args)
         else:
             # TODO: redefinition
+            ctx.tfunc.filename = self.driver.files[-1]
             self.templates[ctx.tfunc.name.text] = FunctionTemplate(ctx.tfunc, args)
 
     def getTemplateInstance(self, template, types):
@@ -1194,7 +1196,11 @@ class Codegen(LangParserVisitor):
 
             template.body.name.text = "$" + template.body.name.text + str(idd)
 
+            self.driver.files.append(template.body.filename)
+
             res = self.visit(template.body)
+
+            self.driver.files.pop()
 
             template.body.name.text = oldname
 
