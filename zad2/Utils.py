@@ -51,6 +51,13 @@ class StructType:
         self.indexes = indexes
         self.isclass = isclass
         self.fields = fields
+        self.fullname = name
+
+class ClassType(ir.PointerType):
+    def __init__(self, name, el, struct):
+        super().__init__(el)
+        self.name = name
+        self.struct = struct
 
 class StructMethod:
     def __init__(self, obj, fn):
@@ -135,19 +142,16 @@ def type2str(typ):
     elif isinstance(typ, SizedArrayType):
         return type2str(typ.element) + "[]"
 
-    elif isinstance(typ, ir.PointerType):
-        if isinstance(typ.pointee, ir.IdentifiedStructType):
-            # TODO: check if this is a class or not!
-            return typ.name
-        return type2str(typ.pointee) + "*"
-
-    elif isinstance(typ, ir.IdentifiedStructType):
+    elif isinstance(typ, ClassType) or isinstance(typ, ir.IdentifiedStructType):
+        if typ.name[0] == "$":
+            return typ.fullname
         return typ.name
+
+    elif isinstance(typ, ir.PointerType):
+        return type2str(typ.pointee) + "*"
 
     elif isinstance(typ, ir.FunctionType):
         # TODO: var args 
         return "f(" + ','.join(map(lambda x: type2str(x), typ.args)) + ")->" + type2str(typ.return_type)
-
-    # TODO: Add templates!
 
     return "?"

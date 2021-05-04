@@ -501,7 +501,8 @@ class Codegen(LangParserVisitor):
             ltype = ir.LiteralStructType(vtype.elements)
             size =  ltype.get_abi_size(self.target_machine.target_data)
             ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
-            ptr = self.builder.bitcast(ptr, vtype.as_pointer())
+            ctype = ClassType(name, vtype, self.structs[name])
+            ptr = self.builder.bitcast(ptr, ctype)
             self.builder.store(result, ptr)
             ptr.type.isclass = True
             result = ptr
@@ -1184,14 +1185,14 @@ class Codegen(LangParserVisitor):
             return res
 
     def visitStructValTemplate(self, ctx: LangParser.StructValTemplateContext):
-        name = ctx.name.text
+        tname = ctx.name.text
         types = self.visit(ctx.types)
         args = self.visit(ctx.arguments)
 
-        template = self.templates[name]
+        template = self.templates[tname]
 
         if len(types) != len(template.types):
-            raise CodegenException(ctx.start, "ehh not working :(")
+            raise CodegenException(ctx.start, f"need {len(template.types)} types but got only {len(types)}")
 
         self_types = {}
         
@@ -1212,15 +1213,19 @@ class Codegen(LangParserVisitor):
                 ctx.start, "struct must be built from consts elements")
 
         if any([not a.type == b for a, b in zip(args, vtype.elements)]):
-            raise CodegenException(ctx.start, "types mismatch" + str(vtype.elements))
+            raise CodegenException(ctx.start, "types mismatch")
 
         result = ir.Constant(vtype, [x.constant for x in args])
+
+        full_name = f"{tname}({','.join([type2str(t) for t in types])})"
+        vtype.fullname = full_name
 
         if self.structs[name].isclass:
             ltype = ir.LiteralStructType(vtype.elements)
             size = ltype.get_abi_size(self.target_machine.target_data)
             ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
-            ptr = self.builder.bitcast(ptr, vtype.as_pointer())
+            ctype = ClassType(full_name, vtype, self.structs[name])
+            ptr = self.builder.bitcast(ptr, ctype)
             self.builder.store(result, ptr)
             result = ptr
 
