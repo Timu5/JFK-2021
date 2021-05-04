@@ -591,6 +591,18 @@ class Codegen(LangParserVisitor):
                 a = left.type.elements[1].pointee.element
                 el_size = ir.Constant(ulong, a.get_abi_size(self.target_machine.target_data))
                 return self.builder.call(self.runtime['array_add'], [left, right, el_size, self.runtime['GC_malloc']])
+            
+            elif isClassOrStruct(left):
+                value = left
+                st_name = None
+                if value.type.is_pointer:
+                    st_name = value.type.pointee.name
+                else:
+                    st_name = value.type.name
+                st = self.structs[st_name]
+                if "binop" in st.members:
+                    fn = st.members["binop"]
+                    return self.builder.call(fn, [left, right, int_(ord(ctx.op.text[0]))])
 
         else:
             #if isinstance(left.type, SizedArrayType) and isinstance(right.type, left.type.element):
