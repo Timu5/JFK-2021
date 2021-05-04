@@ -928,7 +928,29 @@ class Codegen(LangParserVisitor):
         #return ir.ArrayType(typ, elements)
 
     def visitTemplateType(self, ctx:LangParser.TemplateTypeContext):
-        raise CodegenException(ctx.start, "not implemented")
+        tname = ctx.children[0].getText()
+        types = self.visit(ctx.arguments)
+
+        template = self.templates[tname]
+
+        if len(types) != len(template.types):
+            raise CodegenException(ctx.start, f"need {len(template.types)} types but got only {len(types)}")
+
+        self_types = {}
+        
+        for i in range(len(types)):
+            self_types[template.types[i]] = types[i]
+
+        name = self.getTemplateInstance(template, self_types)
+
+        full_name = f"{tname}({','.join([type2str(t) for t in types])})"
+        vtype = self.module.context.get_identified_type(name)
+        vtype.fullname = full_name
+
+        if self.structs[name].isclass:
+            return ClassType(full_name, vtype, self.structs[name])
+        
+        return vtype
 
     def visitFnargs(self, ctx: LangParser.FnargsContext):
         if ctx.children is None:
