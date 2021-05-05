@@ -26,15 +26,11 @@ class Driver:
         self.target_machine = None
         self.files = []
 
+
     def llvm_init(self):
         llvm.initialize()
         llvm.initialize_native_target()
         llvm.initialize_native_asmprinter()
-        #llvm.load_library_permanently("gc.dll")
-        #llvm.load_library_permanently("runtime.dll")
-
-        llvm.load_library_permanently("./runtime/build/bdwgc/libgc.so")
-        llvm.load_library_permanently("./runtime/build/libruntime.so")
 
         self.target = llvm.Target.from_default_triple()
         self.target_machine = self.target.create_target_machine()
@@ -59,15 +55,16 @@ class Driver:
     def compile(self, module, basename):
         mod = llvm.parse_assembly(str(module))
         mod.verify()
-        with open(f"{basename}.o" % basename, "wb") as o:
+        with open(f"{basename}.o", "wb") as o:
             o.write(self.target_machine.emit_object(mod))
 
 
     def invoke_linker(self, basename):
         # easy solution call clang with object file
         # harder solution use ld or lld
+
         # import subprocess
-        # subprocess.call(["ls", "-l"])
+        # subprocess.call(["clang", "a", "b"])
         pass
 
 
@@ -83,7 +80,7 @@ class Driver:
     def compile_file(self, filename, target_machine):
         with open(filename) as f:
             self.files.append(f.name)
-            tree = self.parse_text(f.read())
+            tree, parser_ = self.parse_text(f.read())
             codegen = Codegen.Codegen(self, target_machine)
             module = codegen.gen_ir(tree)
             self.files.pop()
@@ -105,7 +102,7 @@ class Driver:
         except Exception:
             quit()
 
-        return tree
+        return tree, parser
 
     def main(self):
         parser = argparse.ArgumentParser(description='My super lang compiler')
@@ -128,10 +125,10 @@ class Driver:
 
         self.files.append(f.name)
 
-        tree = self.parse_text(txt)
+        tree, parser_ = self.parse_text(txt)
 
         if args.ast:
-            print(Trees.toStringTree(tree, None, parser))
+            print(Trees.toStringTree(tree, None, parser_))
             print()
             quit()
 
@@ -150,10 +147,12 @@ class Driver:
             quit()
 
         if args.run:
+            llvm.load_library_permanently("./runtime/build/bdwgc/libgc.so")
+            llvm.load_library_permanently("./runtime/build/libruntime.so")
             self.exec(ir)
         else:
             # compile to file
-            print("Compile not ready yet :(")
+            self.compile(ir, "./" + self.files[-1])
             pass
 
         self.files.pop()
