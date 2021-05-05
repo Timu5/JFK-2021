@@ -486,16 +486,24 @@ class Codegen(LangParserVisitor):
         vtype = self.module.context.get_identified_type(name)
 
         args = self.visit(ctx.children[2])
-        if len(args) == 0:
-            raise CodegenException(ctx.start, "cannot create empty struct")
-        if any([not isinstance(a, ir.Constant) for a in args]):
-            raise CodegenException(
-                ctx.start, "struct must be built from consts elements")
 
-        if any([not a.type == b for a, b in zip(args, vtype.elements)]):
-            raise CodegenException(ctx.start, "types mismatch")
+        # constructor or not
+        init = None
+        result = None
+        struct = self.structs[name]
+        if "init" in struct.members and struct.isclass:
+            init = struct.members["init"]
+        else:
+            if len(args) == 0:
+                raise CodegenException(ctx.start, "cannot create empty struct")
+            if any([not isinstance(a, ir.Constant) for a in args]):
+                raise CodegenException(
+                    ctx.start, "struct must be built from consts elements")
 
-        result = ir.Constant(vtype, [x.constant for x in args])
+            if any([not a.type == b for a, b in zip(args, vtype.elements)]):
+                raise CodegenException(ctx.start, "types mismatch")
+
+            result = ir.Constant(vtype, [x.constant for x in args])
 
         if self.structs[name].isclass:
             ltype = ir.LiteralStructType(vtype.elements)
@@ -503,9 +511,14 @@ class Codegen(LangParserVisitor):
             ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
             ctype = ClassType(name, vtype, self.structs[name])
             ptr = self.builder.bitcast(ptr, ctype)
-            self.builder.store(result, ptr)
+            if init is None:
+                self.builder.store(result, ptr)
             ptr.type.isclass = True
             result = ptr
+            # init
+            if not init is None:
+                # TODO: check number of arguments and types
+                self.builder.call(init, [result] + args)
 
         return result
 
@@ -521,7 +534,7 @@ class Codegen(LangParserVisitor):
         elif op == 'and':
             return self.builder.and_(left, right)
 
-        raise CodegenException(ctx.start, "unknown operator")
+        raise CodegenException(ctx.start, f'unknown operator "{op}"')
 
     def promote(self, left, right, ctx):
         # TODO: Add difrent types and make this more generic
@@ -916,6 +929,9 @@ class Codegen(LangParserVisitor):
         elif name == "string":
             return StringType()
         elif name in self.structs:
+            if self.structs[name].isclass:
+                # TODO: finish class type
+                pass
             return self.module.context.get_identified_type(name)
         elif name in self.types:
             return self.types[name]
@@ -1190,7 +1206,7 @@ class Codegen(LangParserVisitor):
             ctx.tstruct.filename = self.driver.files[-1]
             self.templates[ctx.tstruct.name.text] = StructTemplate(ctx.tstruct, args)
         else:
-            # TODO: redefinition
+            # TODO: check redefinition
             ctx.tfunc.filename = self.driver.files[-1]
             self.templates[ctx.tfunc.name.text] = FunctionTemplate(ctx.tfunc, args)
 
@@ -1249,28 +1265,41 @@ class Codegen(LangParserVisitor):
 
         vtype = self.module.context.get_identified_type(name)
 
-        if len(args) == 0:
-            raise CodegenException(ctx.start, "cannot create empty struct")
-        if any([not isinstance(a, ir.Constant) for a in args]):
-            raise CodegenException(
-                ctx.start, "struct must be built from consts elements")
+        # constructor or not
+        init = None
+        result = None
+        struct = self.structs[name]
+        if "init" in struct.members and struct.isclass:
+            init = struct.members["init"]
+        else:
+            if len(args) == 0:
+                raise CodegenException(ctx.start, "cannot create empty struct")
+            if any([not isinstance(a, ir.Constant) for a in args]):
+                raise CodegenException(
+                    ctx.start, "struct must be built from consts elements")
 
-        if any([not a.type == b for a, b in zip(args, vtype.elements)]):
-            raise CodegenException(ctx.start, "types mismatch")
+            if any([not a.type == b for a, b in zip(args, vtype.elements)]):
+                raise CodegenException(ctx.start, "types mismatch")
 
-        result = ir.Constant(vtype, [x.constant for x in args])
+            result = ir.Constant(vtype, [x.constant for x in args])
 
         full_name = f"{tname}({','.join([type2str(t) for t in types])})"
         vtype.fullname = full_name
 
         if self.structs[name].isclass:
             ltype = ir.LiteralStructType(vtype.elements)
-            size = ltype.get_abi_size(self.target_machine.target_data)
+            size =  ltype.get_abi_size(self.target_machine.target_data)
             ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
             ctype = ClassType(full_name, vtype, self.structs[name])
             ptr = self.builder.bitcast(ptr, ctype)
-            self.builder.store(result, ptr)
+            if init is None:
+                self.builder.store(result, ptr)
+            ptr.type.isclass = True
             result = ptr
+            # init
+            if not init is None:
+                # TODO: check number of arguments and types
+                self.builder.call(init, [result] + args)
 
         return result
 
@@ -1282,7 +1311,7 @@ class Codegen(LangParserVisitor):
         template = self.templates[name]
 
         if len(types) != len(template.types):
-            raise CodegenException(ctx.start, "ehh not working :(")
+            raise CodegenException(ctx.start, f"need {len(template.types)} types but got only {len(types)}")
 
         self_types = {}
         for i in range(len(types)):
