@@ -813,11 +813,14 @@ class Codegen(LangParserVisitor):
 
 
     def visitBreak(self, ctx:LangParser.BreakContext):
-        # TODO: handle missing loop
+        if len(self.loops) == 0:
+            raise CodegenException(ctx.start, "nothing to break from")
+        
         if not ctx.number is None:
             number = int(ctx.number.text)
             for i in range(number):
                 end = self.loops.pop()
+        
         end = self.loops.pop()
         self.builder.branch(end)
 
