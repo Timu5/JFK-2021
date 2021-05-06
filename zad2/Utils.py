@@ -111,27 +111,27 @@ def isClassOrStruct(x):
     return False
 
 def type2str(typ):
-    if typ == int_:
+    if typ is int_:
         return "int"
-    elif typ == uint:
+    elif typ is uint:
         return "uint"
-    elif typ == long_:
+    elif typ is long_:
         return "long"
-    elif typ == ulong:
+    elif typ is ulong:
         return "ulong"
-    elif typ == short_:
+    elif typ is short_:
         return "short"
-    elif typ == ushort:
+    elif typ is ushort:
         return "ushort"
-    elif typ == byte_:
+    elif typ is byte_:
         return "byte"
-    elif typ == ubyte:
+    elif typ is ubyte:
         return "ubyte"
-    elif typ == half_:
+    elif typ is half_:
         return "half"
-    elif typ == float_:
+    elif typ is float_:
         return "float"
-    elif typ == double_:
+    elif typ is double_:
         return "double"
     elif typ == ir.VoidType():
         return "void"
