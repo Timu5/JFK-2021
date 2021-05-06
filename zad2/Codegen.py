@@ -294,7 +294,7 @@ class Codegen(LangParserVisitor):
 
     def visitUnary(self, ctx: LangParser.UnaryContext):
         op = ctx.op
-        primary = self.visit(ctx.primary)
+        primary = self.visit(ctx.value)
 
         if isinstance(primary, ir.Constant):
             pass
