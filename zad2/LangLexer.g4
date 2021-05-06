@@ -14,21 +14,6 @@ WS: ' '+ -> skip;
 COMMENT: '#=' .*? '=#' -> skip;
 COMMENT_LINE: '#' (~('\n'))* -> skip;
 
-INT: '-'? [0-9]+;
-FLOAT: '-'? ([0-9]* '.' [0-9]+) | ([0-9]+ '.' [0-9]*);
-ESCAPE:
-	'\\\''
-	| '\\"'
-	| '\\\\'
-	| '\\n'
-	| '\\r'
-	| '\\t'
-	| '\\b'
-	| '\\f'
-	| '\\0'
-	| ('\\x' [a-fA-F0-9][a-fA-F0-9]);
-CHAR: '\'' (~'\\' | ESCAPE) '\'';
-
 DPLUS: '++';
 PLUS: '+';
 DMINUS: '--';
@@ -68,7 +53,7 @@ CONTRIUNE: 'continue';
 RETURN: 'return';
 PASS: 'pass';
 FN: 'fn';
-F: 'f';
+//F: 'f';
 STRUCT: 'struct';
 CLASS: 'class';
 EXTERN: 'extern';
@@ -80,6 +65,22 @@ IMPORT: 'import';
 TEMPLATE: 'template';
 SLASH: '\\';
 ID: [_a-zA-Z][_0-9a-zA-Z]*;
+
+INT: '-'? [0-9]+;
+FLOAT: '-'? ([0-9]* '.' [0-9]+) | ([0-9]+ '.' [0-9]*);
+ESCAPE:
+	'\\\''
+	| '\\"'
+	| '\\\\'
+	| '\\n'
+	| '\\r'
+	| '\\t'
+	| '\\b'
+	| '\\f'
+	| '\\0'
+	| ('\\x' [a-fA-F0-9][a-fA-F0-9]);
+CHAR: '\'' (~'\\' | ESCAPE) '\'';
+
 
 OPEN_STRING: '"' -> pushMode(IN_STRING);
 

@@ -14,7 +14,7 @@ vtype:
 	ID																			# basicType
 	| vtype '*'																	# pointerType
 	| vtype '[' (size = INT)? ']'												# arrayType
-	| 'f' '(' arguments = fnargs (',' varargs = '...')? ')' '->' ret = vtype	# fnType
+	| 'fn' '(' arguments = fnargs (',' varargs = '...')? ')' '->' ret = vtype	# fnType
 	| ID '(' arguments = fnargs ')'												# templateType;
 
 args: (expr (COMMA expr)*)?;
