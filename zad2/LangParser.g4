@@ -14,23 +14,32 @@ vtype:
 	ID																			# basicType
 	| vtype '*'																	# pointerType
 	| vtype '[' (size = INT)? ']'												# arrayType
+	| 'f' '(' arguments = fnargs (',' varargs = '...')? ')' '->' ret = vtype	# fnType
 	| ID '(' arguments = fnargs ')'												# templateType;
 
 args: (expr (COMMA expr)*)?;
 
 primary:
-	op = (PLUS | MINUS | NOT) value = primary								# unary
-	| value = INT literal = ID?												# number
-	| value = FLOAT literal = ID?											# float
-	| CHAR																	# char
-	| fstring																# string
-	| ID																	# var
-	| '[' args ']'															# array
+	op = (PLUS | MINUS | NOT) value = primary							# unary
+	| value = INT literal = ID?											# number
+	| value = FLOAT literal = ID?										# float
+	| CHAR																# char
+	| fstring															# string
+	| ID																# var
+	| '[' args ']'														# array
 	| name = ID '(' types = fnargs ')' '{' arguments = args '}'			# structValTemplate
+	| name = ID '{' args '}'											# structVal
 	| 'cast' '(' vartype = vtype ')' value = primary					# cast
 	| 'typeid' '(' vartype = vtype ')'									# typeid
 	| value = primary '(' types = fnargs ')' '(' arguments = args ')'	# callTemplate
 	| value = primary '(' arguments = args ')'							# call
+	| LPAREN expr RPAREN												# parenthesis
+	| primary '.' (ID | TYPEID)											# member
+	| primary '[' expr ']'												# index
+	| '&' value = primary												# address
+	| '*' value = primary												# deref
+	| op = ('++' | '--') value = primary								# pre
+	| value = primary op = ('++' | '--')								# post;
 
 expr:
 	left = expr op = (MULT | DIV) right = expr							# binary
@@ -64,7 +73,8 @@ statement:
 
 globalVar:
 	name = ID (
-		((':' vartype = vtype)? ('=' value = expr)?)
+		(':' vartype = vtype)
+		| (':' vartype = vtype '=' value = expr)
 		| (':=' value = expr)
 	) NL;
 
@@ -89,7 +99,7 @@ structMember:
 	| func = function					# structMethod;
 structMembers: (structMember)+;
 struct:
-	('struct' | 'class') name = ID ':' INDENT members = structMembers DEDENT;
+	('struct' | 'class') name = ID ('(' parent = ID ')')? ':' INDENT members = structMembers DEDENT;
 
 importLib: IMPORT name = ID NL;
 

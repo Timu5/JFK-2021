@@ -29,10 +29,10 @@ ESCAPE:
 	| ('\\x' [a-fA-F0-9][a-fA-F0-9]);
 CHAR: '\'' (~'\\' | ESCAPE) '\'';
 
-PLUS: '+';
 DPLUS: '++';
-MINUS: '-';
+PLUS: '+';
 DMINUS: '--';
+MINUS: '-';
 MULT: '*';
 DIV: '/';
 LPAREN: '(' -> pushMode(DEFAULT_MODE);
