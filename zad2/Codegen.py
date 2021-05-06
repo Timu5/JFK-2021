@@ -642,7 +642,7 @@ class Codegen(LangParserVisitor):
                 raise CodegenException(
                     ctx.op.start, "mix between signed and unsigned values")
 
-        elif isinstance(left.type, ir.FloatType):
+        elif isinstance(left.type, ir.types._BaseFloatType):
             return self.builder.fcmp_ordered(op, left, right)
 
         raise CodegenException(ctx.start, "unusported type in compare")
