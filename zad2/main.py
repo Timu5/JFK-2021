@@ -118,7 +118,7 @@ class Driver:
 
         if len(args.file) > 1:
             print("Multiple files not supported yet :(")
-            quit()
+            return
 
         f = args.file[0]
         txt = f.read()
@@ -130,7 +130,7 @@ class Driver:
         if args.ast:
             print(Trees.toStringTree(tree, None, parser_))
             print()
-            quit()
+            return
 
         self.llvm_init()
 
@@ -140,11 +140,11 @@ class Driver:
             ir = codegen.gen_ir(tree)
         except CodegenException as ex:
             self.printerror(ex.line, ex.column, ex.msg)
-            quit()
+            return
 
         if args.ir:
             print(str(ir))
-            quit()
+            return
 
         if args.run:
             llvm.load_library_permanently("./runtime/build/bdwgc/libgc.so")
