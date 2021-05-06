@@ -18,6 +18,7 @@ class Codegen(LangParserVisitor):
         self.counter = 0
         self.locals = {}
         self.structs = {}
+        self.classes = {}
         self.templates = {}
         self.loops = []
         self.types = {}
@@ -427,8 +428,6 @@ class Codegen(LangParserVisitor):
                 idx = struct.indexes[name]
             elif name in struct.members:
                 idx = None
-                if struct.isclass:
-                    return StructMethod(primary.operands[0], struct.members[name])
                 return StructMethod(primary, struct.members[name])
         except Exception:
             raise CodegenException(
@@ -510,6 +509,7 @@ class Codegen(LangParserVisitor):
             size =  ltype.get_abi_size(self.target_machine.target_data)
             ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
             ctype = ClassType(name, vtype, self.structs[name])
+            self.classes[name] = ctype
             ptr = self.builder.bitcast(ptr, ctype)
             if init is None:
                 self.builder.store(result, ptr)
@@ -930,8 +930,7 @@ class Codegen(LangParserVisitor):
             return StringType()
         elif name in self.structs:
             if self.structs[name].isclass:
-                # TODO: finish class type
-                pass
+                return self.classes[name]
             return self.module.context.get_identified_type(name)
         elif name in self.types:
             return self.types[name]
@@ -979,7 +978,9 @@ class Codegen(LangParserVisitor):
         vtype.fullname = full_name
 
         if self.structs[name].isclass:
-            return ClassType(full_name, vtype, self.structs[name])
+            ctype = ClassType(full_name, vtype, self.structs[name])
+            self.classes[full_name] = ctype
+            return ctype
         
         return vtype
 
@@ -1123,7 +1124,13 @@ class Codegen(LangParserVisitor):
     def visitStruct(self, ctx: LangParser.StructContext):
         class_ = ctx.children[0].symbol.text == 'class'
         name = ctx.name.text
+        parent = ctx.parent
         members = self.visit(ctx.members)
+
+        if not parent is None:
+            if not parent.text in self.structs:
+                raise CodegenException(ctx.parent, f'no element with name "{parent.text}"')
+            parent = self.structs[parent.text]
 
         fields = []
         indexes = {}
@@ -1131,22 +1138,33 @@ class Codegen(LangParserVisitor):
 
         result = {}
 
+        offset = 0 if parent is None else len(parent.fields)
+
         for m in members:
             if not m['fn'] is None:
                 methods[m['name']] = m['fn']
                 result[m['name']] = m['fn']
             else:
                 fields.append(m['type'])
-                indexes[m['name']] = len(fields) - 1
+                indexes[m['name']] = len(fields) - 1 + offset
                 result[m['name']] = m['type']
 
         if name in self.structs:
             raise CodegenException(ctx.start, f'struct "{name}" redefinition')
 
+        if not parent is None:
+            fields = parent.fields + fields
+            indexes = {**parent.indexes, **indexes}
+            result = {**parent.members, **result}
+            pass
+
         b = self.module.context.get_identified_type(name)
         b.set_body(*fields)
 
         self.structs[name] = StructType(name, result, indexes, fields, isclass=class_)
+
+        if class_:
+            self.classes[name] = ClassType(name, b, self.structs[name])
 
         functions = {}
 
@@ -1291,6 +1309,7 @@ class Codegen(LangParserVisitor):
             size =  ltype.get_abi_size(self.target_machine.target_data)
             ptr = self.builder.call(self.runtime['GC_malloc'], [ulong(size)])
             ctype = ClassType(full_name, vtype, self.structs[name])
+            self.classes[full_name] = ctype
             ptr = self.builder.bitcast(ptr, ctype)
             if init is None:
                 self.builder.store(result, ptr)
