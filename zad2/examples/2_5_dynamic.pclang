@@ -1,0 +1,4 @@
+import stdio
+
+fn main(argc: int, argv: byte**) -> int:
+    return 0

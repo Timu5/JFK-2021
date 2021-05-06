@@ -1,0 +1,37 @@
+
+import conv
+import stdio
+
+class foo:
+    value: int
+
+    fn init() -> void:
+        this.value = 100
+    
+    fn print_name() -> void:
+        println("foo \(this.value)")
+
+template(T)
+class bar(foo):
+    value2: T
+
+    fn init(a: T) -> void:
+        this.value = 200
+        this.value2 = a
+    
+    fn print_name() -> void:
+        println("bar \(this.value) \(this.value2)")
+
+fn main(argc: int, argv: byte**) -> int:
+
+    a := foo{}
+    a.print_name()
+
+    b := bar(double){1.0}
+    b.print_name()
+
+    a = cast(foo)b
+
+    a.print_name()
+
+    return 0

@@ -1,0 +1,20 @@
+import stdio
+
+fn main(argc: int, argv: byte**) -> int:
+    x := "abc"
+    y := "def"
+
+    println("len: \(x.length)")
+
+    println(x[2])
+    
+    println(x[1])
+    x[1] = 'X'
+    println(x[1])
+
+    z := x + y # garbage collector take care of memory leaks
+    println(z)
+
+    println(z + "xyz")
+
+    return 1

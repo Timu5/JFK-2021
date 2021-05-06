@@ -1,0 +1,17 @@
+import stdio
+import conv
+
+fn main(argc: int, argv: byte**) -> int:
+    println("Hello world")
+    
+    print("What is your name: ")
+    name := readln()
+    print("Your name is ")
+    println(name)
+
+    print("How old are you: ")
+    age := parseInt(readln())
+    print("Your age is ")
+    println(age)
+    
+    return 1

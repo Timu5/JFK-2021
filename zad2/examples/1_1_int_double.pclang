@@ -1,0 +1,14 @@
+import stdio
+
+fn main(argc: int, argv: byte**) -> int:
+    i: int = 10
+    d: double = 1.0
+    
+    x: double = i + d
+
+    y: int = 1 + cast(int)d
+    
+    println(x)
+    println(y)
+    
+    return 1

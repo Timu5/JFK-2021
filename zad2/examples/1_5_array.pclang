@@ -1,0 +1,18 @@
+import stdio
+
+fn main(argc: int, argv: byte**) -> int:
+    x := [1,2,3]
+    y := [10,11,12]
+
+    print("len: ")
+    println(x.length)
+
+    println(x[2])
+    
+    println(x[1])
+    x[1] = 0
+    println(x[1])
+
+    z := x + y # garbage collector take care of memory leaks
+
+    return 1

@@ -1,0 +1,11 @@
+import stdio
+
+fn fib(n: int) -> int:
+    if n <= 1:
+        return n 
+    return fib(n - 1) + fib(n - 2)
+
+
+fn main(argc: int, argv: byte**) -> int:
+    println("fib(11) = \(fib(11))")
+    return 1

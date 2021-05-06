@@ -1,0 +1,16 @@
+import stdio
+
+fn main(argc: int, argv: byte**) -> int:
+    a := 0.9f
+
+    if 0.3f + 0.6f != a:
+        println("Known problem with floating points numbers :/")
+
+    x := [9,7,5]
+
+    i := 0
+    while i < x.length:
+        println("el \(i): \(x[i])")
+        i++
+
+    return 1

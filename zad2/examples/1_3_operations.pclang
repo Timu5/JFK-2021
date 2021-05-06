@@ -1,0 +1,19 @@
+import stdio
+
+fn main(argc: int, argv: byte**) -> int:
+    x := 2.0
+    y := 0.5
+
+    a := x * y
+    b := x / y
+    c := x + y
+    d := x - y
+    e := x++
+    F := --x
+    g := -x
+    h := (x+x)*(y+y)
+
+    z: double* = &x
+    *z = 3.0
+    
+    return 1
