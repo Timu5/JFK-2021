@@ -360,11 +360,11 @@ class Codegen(LangParserVisitor):
         if isinstance(value.type, StringType):
                 return value
         elif isinstance(value.type, UnsignedType):
-            if value.type != ulong:
+            if not value.type is ulong:
                 value = self.cast(value, ulong)
             return self.builder.call(self.runtime['tostr_ulong'], [value, self.runtime['GC_malloc_atomic']])
         elif isinstance(value.type, SignedType):
-            if value.type != long_:
+            if not value.type is long_:
                 value = self.cast(value, ulong)
             return self.builder.call(self.runtime['tostr_slong'], [value, self.runtime['GC_malloc_atomic']])
         elif isinstance(value.type, ir.types._BaseFloatType):
@@ -396,8 +396,7 @@ class Codegen(LangParserVisitor):
             return ulong(hash(type2str(primary.type)))
         elif isinstance(primary.type, SizedArrayType) or isinstance(primary.type, StringType):
             if not isinstance(primary, ir.LoadInstr):
-                raise CodegenException(
-                    ctx.start, "hle?")
+                raise CodegenException(ctx.start, "unexpected primary")
             primary = primary.operands[0]
             self.builder.block.instructions.pop()
             if name == 'length':
@@ -421,7 +420,7 @@ class Codegen(LangParserVisitor):
             struct_name = primary.type.name
         struct = self.structs[struct_name]
         if not isinstance(primary, ir.LoadInstr):
-            raise CodegenException(ctx.start, "hle2?")
+            raise CodegenException(ctx.start, "unexpected primary")
         oldprim = primary
         try:
             if name in struct.indexes:
@@ -463,10 +462,6 @@ class Codegen(LangParserVisitor):
     def visitVar(self, ctx: LangParser.VarContext):
         name = ctx.getText()
         var = self.getVar(name, ctx)
-
-        '''if var.type.is_pointer:
-            if isinstance(var.type.pointee, ir.ArrayType):
-                return var'''
 
         if isinstance(var, ir.Function) or isinstance(var, FunctionTemplate):
             return var
@@ -554,8 +549,7 @@ class Codegen(LangParserVisitor):
                 left = self.cast(left, right.type)
             else:
                 raise CodegenException(ctx.start, "mix of signed and unsigned values")
-        #else:
-        #    raise CodegenException(ctx.start, "wrong type to promote")
+
         return left, right
 
     def visitBinary(self, ctx: LangParser.BinaryContext):
@@ -618,8 +612,6 @@ class Codegen(LangParserVisitor):
                     return self.builder.call(fn, [left, right, int_(ord(ctx.op.text[0]))])
 
         else:
-            #if isinstance(left.type, SizedArrayType) and isinstance(right.type, left.type.element):
-            #    pass
             raise CodegenException(ctx.start, f"dont know how to perform binary operation on {type2str(left.type)} and {type2str(right.type)}")
 
 
@@ -712,8 +704,6 @@ class Codegen(LangParserVisitor):
                     arg_llvm = self.builder.fpext(arg_llvm, double_)
             else:
                 if fn_args[i] != arg_llvm.type:
-                    # TODO: fix me
-                    #raise CodegenException(ctx.arguments.children[i*2].start, f"argument {i+1} have wrong type, expected type {type2str(fn_args[i])} got {type2str(arg_llvm.type)}")
                     raise CodegenException(ctx.start, f"argument {i+1} have wrong type, expected type {type2str(fn_args[i])} got {type2str(arg_llvm.type)}")
 
             irargs.append(arg_llvm)
@@ -757,9 +747,6 @@ class Codegen(LangParserVisitor):
             return self.builder.icmp_signed("!=", value, ir.Constant(value.type, 0))
         elif isinstance(value.type, ir.FloatType) or isinstance(value.type, ir.HalfType) or isinstance(value.type, ir.DoubleType):
             return self.builder.fcmp_ordered("!=", value, ir.Constant(value.type, 0.0))
-        # elif isinstance(cond.type, ir.PointerType):
-        #    pass
-        # TODO: check how to compare to NULL
         else:
             raise CodegenException(ctx.start, "unknown type for bool value")
 
@@ -954,8 +941,6 @@ class Codegen(LangParserVisitor):
         if ctx.size == None:
             return SizedArrayType(typ)
         raise CodegenException(ctx.start, "arrays with const size not supported")
-        #elements = int(ctx.size.text)
-        #return ir.ArrayType(typ, elements)
 
     def visitTemplateType(self, ctx:LangParser.TemplateTypeContext):
         tname = ctx.children[0].getText()
@@ -1205,7 +1190,7 @@ class Codegen(LangParserVisitor):
             # TODO: check struct redefinition!
             self.structs[s] = members
             pass
-        #self.templates = self.templates | module.templates # only python 3.9
+        # self.templates = self.templates | module.templates # only in python 3.9
         self.templates = {**self.templates, **module.templates}
 
     def visitRawArgs(self, ctx: LangParser.RawArgsContext):
@@ -1258,7 +1243,6 @@ class Codegen(LangParserVisitor):
             self.locals = oldlocals
             template.implemented[signature] = res
             
-            # TODO: check types
             return res
 
     def visitStructValTemplate(self, ctx: LangParser.StructValTemplateContext):
