@@ -54,7 +54,7 @@ class Pair:
         this.second = second
 
 # Instantiate a pair of integers
-pair_of_ints = Pair(int)(5, 10)
+pair_of_ints = Pair(int){5, 10}
 ```
 
 ### String Interpolation:
