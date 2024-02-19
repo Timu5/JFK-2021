@@ -64,6 +64,35 @@ age = 30
 println(f"Hello, my name is \(name) and I am \(age) years old.")
 ```
 
+### Struct Definition with Operator Overloading:
+```python
+struct vector3:
+    x: double
+    y: double
+    z: double
+
+    fn str() -> string:
+        return "\(this.x), \(this.y), \(this.z)"
+
+    fn binop(right: vector3, op: int) -> vector3:
+        result := vector3{0.0, 0.0, 0.0}
+        if op == cast(int)'+':
+            result.x = this.x + right.x
+            result.y = this.y + right.y
+            result.z = this.z + right.z
+        else:
+            println("Unknown operation '\(op)'")
+        return result
+
+# ...
+    myvector := vector3{1.0, 2.0, 3.0}
+    myvector2 := vector3{0.5, 1.0, 2.0}
+    println(myvector) # use .str for conversion
+
+    r := myvector + myvector2
+    println(r) # 1.5, 3.0, 5.0
+```
+
 ### C Interoperability:
 ```python
 # Declare an external C function
